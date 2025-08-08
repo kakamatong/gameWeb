@@ -14,7 +14,7 @@ func RegisterRoutes(router *gin.Engine) {
 		// 游戏相关路由
 		game := api.Group("/game")
 		{
-			game.GET("/authlist", controller.GetAuthGameList)
+			game.POST("/authlist", controller.GetAuthGameList)
 		}
 
 		// 用户相关路由

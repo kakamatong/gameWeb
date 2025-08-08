@@ -2,23 +2,22 @@ package controller
 
 import (
 	"encoding/json"
-	"gameWeb/db"
 	"net/http"
-
+	"gameWeb/db"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 // 定义服务节点结构体
-type ServiceNode struct {
+ type ServiceNode struct {
 	Addr       string `json:"addr"`
 	Name       string `json:"name"`
 	Cnt        int    `json:"cnt"`
-	ClientAddr string `json:"clientAddr,omitempty"` // omitempty表示如果为空则不序列化
+	ClientAddr string `json:"clientAddr,omitempty"`
 }
 
 // 定义ClusterConfig结构体
-type ClusterConfig struct {
+ type ClusterConfig struct {
 	List struct {
 		Match    []ServiceNode `json:"match"`
 		Robot    []ServiceNode `json:"robot"`
@@ -67,9 +66,24 @@ func GetAuthGameList(c *gin.Context) {
 		return
 	}
 
-	// 返回解析后的数据
+	// 将gate和game根据类型分开存储
+	result := make(map[string]map[string]string)
+	result["gate"] = make(map[string]string)
+	result["game"] = make(map[string]string)
+
+	// 处理gate数据
+	for _, gate := range clusterConfig.List.Gate {
+		result["gate"][gate.Name] = gate.ClientAddr
+	}
+
+	// 处理game数据
+	for _, game := range clusterConfig.List.Game {
+		result["game"][game.Name] = game.ClientAddr
+	}
+
+	// 返回整理后的数据
 	c.JSON(http.StatusOK, gin.H{
 		"code": 200,
-		"data": clusterConfig,
+		"data": result,
 	})
 }

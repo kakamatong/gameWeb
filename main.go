@@ -1,9 +1,10 @@
 package main
 
-// 在导入部分添加CORS相关包
+// 更新导入部分
 import (
 	"gameWeb/config"
 	"gameWeb/db"
+	"gameWeb/log"
 	"gameWeb/routes"
 	"time"
 
@@ -17,7 +18,7 @@ func init() {
 	config.InitConfig()
 
 	// 初始化日志系统
-	config.InitLogger()
+	log.InitLogger()
 
 	// 初始化数据库连接
 	db.InitMySQL()
@@ -25,7 +26,7 @@ func init() {
 }
 
 func main() {
-	logrus.Info("Starting game web API server")
+	log.Logger.Info("Starting game web API server")
 
 	// 设置gin为发布模式
 	gin.SetMode(gin.ReleaseMode)
@@ -33,8 +34,8 @@ func main() {
 	// 创建Gin引擎，禁用默认日志
 	router := gin.New()
 
-	// 使用自定义日志中间件 - 这里的引用应该已经是正确的，因为我们引用的是包而不是具体文件
-	router.Use(config.GinLogger(), config.GinRecovery())
+	// 使用自定义日志中间件
+	router.Use(log.GinLogger(), log.GinRecovery())
 
 	// 添加CORS中间件
 	router.Use(cors.New(cors.Config{

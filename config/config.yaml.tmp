@@ -1,0 +1,21 @@
+Server:
+  Port: "8080"
+
+MySQL:
+  Host: "localhost"
+  Port: "3306"
+  Username: "root"
+  Password: "password"
+  Database: "game_db"
+  Charset: "utf8mb4"
+
+Redis:
+  Host: "localhost"
+  Port: "6379"
+  Password: ""
+  Database: 0
+
+Log:
+  Level: "info"
+  Path: "logs/game.log"
+  Format: "text"

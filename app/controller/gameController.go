@@ -1,49 +1,47 @@
 package controller
 
 import (
-	"gameWeb/app/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // GetGameList 获取游戏列表
 func GetGameList(c *gin.Context) {
-	games, err := service.GetGameList()
-	if err != nil {
-		logrus.Errorf("Failed to get game list: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "Failed to get game list",
-			"error":   err.Error(),
-		})
-		return
-	}
+	// games, err := service.GetGameList()
+	// if err != nil {
+	// 	logrus.Errorf("Failed to get game list: %v", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"code":    500,
+	// 		"message": "Failed to get game list",
+	// 		"error":   err.Error(),
+	// 	})
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 200,
-		"data": games,
+		"data": "",
 	})
 }
 
 // GetGameDetail 获取游戏详情
 func GetGameDetail(c *gin.Context) {
-	gameID := c.Param("id")
-	game, err := service.GetGameDetail(gameID)
-	if err != nil {
-		logrus.Errorf("Failed to get game detail: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "Failed to get game detail",
-			"error":   err.Error(),
-		})
-		return
-	}
+	// gameID := c.Param("id")
+	// game, err := service.GetGameDetail(gameID)
+	// if err != nil {
+	// 	logrus.Errorf("Failed to get game detail: %v", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{
+	// 		"code":    500,
+	// 		"message": "Failed to get game detail",
+	// 		"error":   err.Error(),
+	// 	})
+	// 	return
+	// }
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 200,
-		"data": game,
+		"data": "",
 	})
 }
 

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"gameWeb/config"
 
+	// Add the MySQL driver import
+	_ "github.com/go-sql-driver/mysql"
+
 	"github.com/sirupsen/logrus"
 )
 

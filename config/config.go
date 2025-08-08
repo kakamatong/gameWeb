@@ -1,7 +1,8 @@
 package config
 
 import (
-	"github.com/sirupsen/logrus"
+	"log"
+
 	"github.com/spf13/viper"
 )
 
@@ -55,11 +56,11 @@ func InitConfig() {
 	viper.SetDefault("Log.Format", "text")
 
 	if err := viper.ReadInConfig(); err != nil {
-		logrus.Warnf("Failed to read config file: %v, using default values", err)
+		log.Printf("Failed to read config file: %v, using default values", err)
 	}
 
 	// 绑定配置到结构体
 	if err := viper.Unmarshal(&AppConfig); err != nil {
-		logrus.Fatalf("Failed to unmarshal config: %v", err)
+		log.Fatalf("Failed to unmarshal config: %v", err)
 	}
 }

@@ -1,6 +1,5 @@
 package main
 
-// 更新导入部分
 import (
 	"gameWeb/config"
 	"gameWeb/db"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -18,7 +16,12 @@ func init() {
 	config.InitConfig()
 
 	// 初始化日志系统
-	log.InitLogger()
+	logConfig := log.LogConfig{
+		Level:  config.AppConfig.Log.Level,
+		Path:   config.AppConfig.Log.Path,
+		Format: config.AppConfig.Log.Format,
+	}
+	log.InitLogger(logConfig)
 
 	// 初始化数据库连接
 	db.InitMySQL()
@@ -53,6 +56,6 @@ func main() {
 	// 启动服务器
 	serverPort := config.AppConfig.Server.Port
 	if err := router.Run(":" + serverPort); err != nil {
-		logrus.Fatalf("Failed to start server: %v", err)
+		log.Logger.Fatalf("Failed to start server: %v", err)
 	}
 }

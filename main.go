@@ -33,7 +33,7 @@ func main() {
 	// 创建Gin引擎，禁用默认日志
 	router := gin.New()
 
-	// 使用自定义日志中间件
+	// 使用自定义日志中间件 - 这里的引用应该已经是正确的，因为我们引用的是包而不是具体文件
 	router.Use(config.GinLogger(), config.GinRecovery())
 
 	// 添加CORS中间件

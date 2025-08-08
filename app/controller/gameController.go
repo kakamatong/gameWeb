@@ -1,9 +1,11 @@
 package controller
 
+// 在导入部分添加net/url包
 import (
 	"encoding/json"
 	"gameWeb/db"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -72,14 +74,17 @@ func GetAuthGameList(c *gin.Context) {
 	result["gate"] = make(map[string]string)
 	result["game"] = make(map[string]string)
 
+	// 在处理gate和game数据时添加urlencode处理
 	// 处理gate数据
 	for _, gate := range clusterConfig.List.Gate {
-		result["gate"][gate.Name] = gate.ClientAddr
+		encodedAddr := url.QueryEscape(gate.ClientAddr)
+		result["gate"][gate.Name] = encodedAddr
 	}
 
 	// 处理game数据
 	for _, game := range clusterConfig.List.Game {
-		result["game"][game.Name] = game.ClientAddr
+		encodedAddr := url.QueryEscape(game.ClientAddr)
+		result["game"][game.Name] = encodedAddr
 	}
 
 	// 返回整理后的数据

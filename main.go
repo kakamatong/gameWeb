@@ -4,6 +4,7 @@ import (
 	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/routes"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -11,10 +12,10 @@ import (
 func init() {
 	// 初始化配置
 	config.InitConfig()
-	
+
 	// 初始化日志系统
 	config.InitLogger()
-	
+
 	// 初始化数据库连接
 	db.InitMySQL()
 	db.InitRedis()
@@ -22,6 +23,9 @@ func init() {
 
 func main() {
 	logrus.Info("Starting game web API server")
+
+	// 设置gin为发布模式，关闭debug
+	gin.SetMode(gin.ReleaseMode)
 
 	// 创建Gin引擎
 	router := gin.Default()

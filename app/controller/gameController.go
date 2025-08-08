@@ -2,14 +2,15 @@ package controller
 
 import (
 	"encoding/json"
-	"net/http"
 	"gameWeb/db"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 // 定义服务节点结构体
- type ServiceNode struct {
+type ServiceNode struct {
 	Addr       string `json:"addr"`
 	Name       string `json:"name"`
 	Cnt        int    `json:"cnt"`
@@ -17,7 +18,7 @@ import (
 }
 
 // 定义ClusterConfig结构体
- type ClusterConfig struct {
+type ClusterConfig struct {
 	List struct {
 		Match    []ServiceNode `json:"match"`
 		Robot    []ServiceNode `json:"robot"`

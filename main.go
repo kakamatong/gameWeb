@@ -27,20 +27,23 @@ func init() {
 func main() {
 	logrus.Info("Starting game web API server")
 
-	// 设置gin为发布模式，关闭debug
+	// 设置gin为发布模式
 	gin.SetMode(gin.ReleaseMode)
 
-	// 创建Gin引擎
-	router := gin.Default()
+	// 创建Gin引擎，禁用默认日志
+	router := gin.New()
+
+	// 使用自定义日志中间件
+	router.Use(config.GinLogger(), config.GinRecovery())
 
 	// 添加CORS中间件
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},                                       // 允许所有来源，生产环境应限制具体域名
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, // 允许的HTTP方法
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // 允许的请求头
-		ExposeHeaders:    []string{"Content-Length"},                          // 暴露的响应头
-		AllowCredentials: true,                                                // 允许携带Cookie
-		MaxAge:           12 * time.Hour,                                      // 预检请求的有效期
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	// 注册路由

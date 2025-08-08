@@ -49,3 +49,12 @@ func InitLogger() {
 		logrus.SetOutput(file)
 	}
 }
+
+// 日志级别常量
+const (
+    LogLevelDebug = "debug"
+    LogLevelInfo  = "info"
+    LogLevelWarn  = "warn"
+    LogLevelError = "error"
+    LogLevelFatal = "fatal"
+)

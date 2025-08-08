@@ -1,10 +1,13 @@
 package main
 
+// 在导入部分添加CORS相关包
 import (
 	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/routes"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -29,6 +32,16 @@ func main() {
 
 	// 创建Gin引擎
 	router := gin.Default()
+
+	// 添加CORS中间件
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},                                       // 允许所有来源，生产环境应限制具体域名
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, // 允许的HTTP方法
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // 允许的请求头
+		ExposeHeaders:    []string{"Content-Length"},                          // 暴露的响应头
+		AllowCredentials: true,                                                // 允许携带Cookie
+		MaxAge:           12 * time.Hour,                                      // 预检请求的有效期
+	}))
 
 	// 注册路由
 	routes.RegisterRoutes(router)

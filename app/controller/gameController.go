@@ -73,6 +73,7 @@ func GetAuthGameList(c *gin.Context) {
 	result := make(map[string]map[string]string)
 	result["gate"] = make(map[string]string)
 	result["game"] = make(map[string]string)
+	result["login"] = make(map[string]string)
 
 	// 在处理gate和game数据时添加urlencode处理
 	// 处理gate数据
@@ -85,6 +86,11 @@ func GetAuthGameList(c *gin.Context) {
 	for _, game := range clusterConfig.List.Game {
 		encodedAddr := url.QueryEscape(game.ClientAddr)
 		result["game"][game.Name] = encodedAddr
+	}
+
+	for _, login := range clusterConfig.List.Login {
+		encodedAddr := url.QueryEscape(login.ClientAddr)
+		result["login"][login.Name] = encodedAddr
 	}
 
 	// 返回整理后的数据

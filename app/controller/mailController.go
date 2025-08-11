@@ -31,22 +31,22 @@ type MailDetailResponse struct {
 // 通用请求结构体
 // 获取邮件列表请求
 type GetMailListRequest struct {
-	UserID string `json:"userid" binding:"required"`
+	UserID int64 `json:"userid" binding:"required"`
 }
 
 // 获取邮件详情请求
 type GetMailDetailRequest struct {
-	UserID string `json:"userid" binding:"required"`
+	UserID int64 `json:"userid" binding:"required"`
 }
 
 // 标记邮件已读请求
 type MarkMailAsReadRequest struct {
-	UserID string `json:"userid" binding:"required"`
+	UserID int64 `json:"userid" binding:"required"`
 }
 
 // 领取邮件奖励请求
 type GetMailAwardRequest struct {
-	UserID string `json:"userid" binding:"required"`
+	UserID int64 `json:"userid" binding:"required"`
 }
 
 // 获取邮件列表
@@ -73,7 +73,7 @@ func GetMailList(c *gin.Context) {
 
 	rows, err := db.MySQLDBGameWeb.Query(query, req.UserID)
 	if err != nil {
-		log.Logger.Errorf("Failed to query mail list for user %s: %v", req.UserID, err)
+		log.Logger.Errorf("Failed to query mail list for user %d: %v", req.UserID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get mail list",
@@ -131,7 +131,7 @@ func GetMailDetail(c *gin.Context) {
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
 	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailID).Scan(
-		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
+		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content, 
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
 
@@ -142,7 +142,7 @@ func GetMailDetail(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail detail for user %s, mail %s: %v", req.UserID, mailID, err)
+			log.Logger.Errorf("Failed to query mail detail for user %d, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get mail detail",
@@ -188,7 +188,7 @@ func MarkMailAsRead(c *gin.Context) {
 
 	result, err := db.MySQLDBGameWeb.Exec(query, req.UserID, mailID)
 	if err != nil {
-		log.Logger.Errorf("Failed to mark mail as read for user %s, mail %s: %v", req.UserID, mailID, err)
+		log.Logger.Errorf("Failed to mark mail as read for user %d, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to mark mail as read",
@@ -262,7 +262,7 @@ func GetMailAward(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail award for user %s, mail %s: %v", req.UserID, mailID, err)
+			log.Logger.Errorf("Failed to query mail award for user %d, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get award",
@@ -294,7 +294,7 @@ func GetMailAward(c *gin.Context) {
 
 	if err != nil {
 		tx.Rollback()
-		log.Logger.Errorf("Failed to update mail status for user %s, mail %s: %v", req.UserID, mailID, err)
+		log.Logger.Errorf("Failed to update mail status for user %d, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",
@@ -323,7 +323,7 @@ func GetMailAward(c *gin.Context) {
 }
 
 // 同步系统邮件到用户邮件表
-func syncSystemMails(userID string) {
+func syncSystemMails(userID int64) {
 	// 查询未过期的系统邮件
 	now := time.Now().Format("2006-01-02 15:04:05")
 	query := `SELECT ms.mailid, ms.startTime, ms.endTime 
@@ -354,7 +354,7 @@ func syncSystemMails(userID string) {
 			VALUES (?, ?, 0, ?, ?)`
 		_, err := db.MySQLDBGameWeb.Exec(insertQuery, userID, mailID, startTime, endTime)
 		if err != nil {
-			log.Logger.Errorf("Failed to insert mail for user %s, mail %d: %v", userID, mailID, err)
+			log.Logger.Errorf("Failed to insert mail for user %d, mail %d: %v", userID, mailID, err)
 		}
 	}
 }

@@ -21,13 +21,14 @@ type MailListResponse struct {
 }
 
 // 邮件详情响应结构体
+// 修改MailDetailResponse结构体定义
 type MailDetailResponse struct {
-	ID      int64  `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	Awards  string `json:"awards"`
-	Status  int    `json:"status"`
-	Time    string `json:"time"`
+	ID      int64          `json:"id"`
+	Title   string         `json:"title"`
+	Content string         `json:"content"`
+	Awards  sql.NullString `json:"awards"`
+	Status  int            `json:"status"`
+	Time    string         `json:"time"`
 }
 
 // 通用请求结构体
@@ -168,9 +169,16 @@ func GetMailDetail(c *gin.Context) {
 
 	mailDetail.Time = updateTime.Format("2006-01-02 15:04:05")
 
+	// 在返回响应前处理Awards字段
+	// 处理Awards为null的情况
+	if !mailDetail.Awards.Valid {
+		mailDetail.Awards.String = ""
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"code": 200,
-		"data": mailDetail,
+		"code":    200,
+		"message": "Success",
+		"data":    mailDetail,
 	})
 }
 

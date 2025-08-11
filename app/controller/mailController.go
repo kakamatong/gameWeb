@@ -5,6 +5,7 @@ import (
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -123,19 +124,30 @@ func GetMailDetail(c *gin.Context) {
 		})
 		return
 	}
+	mailIDInt, err1 := strconv.ParseInt(mailID, 10, 64)
+	if err1 != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "Invalid mail id",
+		})
+		return
+	}
 
+	log.Logger.Infof("GetMailDetail mailIDInt: %d", mailIDInt)
 	// 查询邮件详情
 	query := `SELECT mu.id, m.title, m.content, m.awards, mu.status, mu.update_at 
 			FROM mailUsers mu 
 			JOIN mails m ON mu.mailid = m.id 
-			WHERE mu.userid = ? AND mu.id = ?`
+			WHERE mu.userid = ? AND mu.mailid = ?`
 
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
-	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailID).Scan(
+	log.Logger.Infof("GetMailDetail query: %d %d", req.UserID, mailIDInt)
+	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailIDInt).Scan(
 		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
+	log.Logger.Infof("GetMailDetail err: %v", err)
 
 	if err != nil {
 		if err == sql.ErrNoRows {

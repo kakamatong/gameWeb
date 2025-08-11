@@ -19,6 +19,15 @@ var AppConfig struct {
 		Database string
 		Charset  string
 	}
+	// 添加第二个数据库配置
+	MySQLGameWeb struct {
+		Host     string
+		Port     string
+		Username string
+		Password string
+		Database string
+		Charset  string
+	}
 	Redis struct {
 		Host     string
 		Port     string
@@ -47,6 +56,14 @@ func InitConfig() {
 	viper.SetDefault("MySQL.Password", "password")
 	viper.SetDefault("MySQL.Database", "game_db")
 	viper.SetDefault("MySQL.Charset", "utf8mb4")
+	// 设置第二个数据库默认值
+	viper.SetDefault("MySQLGameWeb.Host", "localhost")
+	viper.SetDefault("MySQLGameWeb.Port", "3306")
+	viper.SetDefault("MySQLGameWeb.Username", "root")
+	viper.SetDefault("MySQLGameWeb.Password", "password")
+	viper.SetDefault("MySQLGameWeb.Database", "gameWeb")
+	viper.SetDefault("MySQLGameWeb.Charset", "utf8mb4")
+	// 其他配置默认值...
 	viper.SetDefault("Redis.Host", "localhost")
 	viper.SetDefault("Redis.Port", "6379")
 	viper.SetDefault("Redis.Password", "")

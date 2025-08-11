@@ -25,6 +25,7 @@ func init() {
 
 	// 初始化数据库连接
 	db.InitMySQL()
+	db.InitMySQLGameWeb() // 初始化第二个数据库连接
 	db.InitRedis()
 }
 

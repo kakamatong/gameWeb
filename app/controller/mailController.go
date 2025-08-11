@@ -49,7 +49,7 @@ func GetMailList(c *gin.Context) {
 			WHERE mu.userid = ? AND mu.status != 3 
 			ORDER BY mu.update_at DESC`
 
-	rows, err := db.MySQLDB.Query(query, userID)
+	rows, err := db.MySQLDBGameWeb.Query(query, userID)
 	if err != nil {
 		log.Logger.Errorf("Failed to query mail list for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -100,7 +100,7 @@ func GetMailDetail(c *gin.Context) {
 
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
-	err := db.MySQLDB.QueryRow(query, userID, mailID).Scan(
+	err := db.MySQLDBGameWeb.QueryRow(query, userID, mailID).Scan(
 		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
@@ -148,7 +148,7 @@ func MarkMailAsRead(c *gin.Context) {
 			SET status = 1, update_at = CURRENT_TIMESTAMP 
 			WHERE userid = ? AND id = ? AND status = 0`
 
-	result, err := db.MySQLDB.Exec(query, userID, mailID)
+	result, err := db.MySQLDBGameWeb.Exec(query, userID, mailID)
 	if err != nil {
 		log.Logger.Errorf("Failed to mark mail as read for user %s, mail %s: %v", userID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -188,7 +188,7 @@ func GetMailAward(c *gin.Context) {
 	}
 
 	// 开始事务
-	tx, err := db.MySQLDB.Begin()
+	tx, err := db.MySQLDBGameWeb.Begin()
 	if err != nil {
 		log.Logger.Errorf("Failed to start transaction: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -288,7 +288,7 @@ func syncSystemMails(userID string) {
 				WHERE mu.userid = ? AND mu.mailid = ms.mailid
 			)`
 
-	rows, err := db.MySQLDB.Query(query, now, userID)
+	rows, err := db.MySQLDBGameWeb.Query(query, now, userID)
 	if err != nil {
 		log.Logger.Errorf("Failed to query system mails: %v", err)
 		return
@@ -306,7 +306,7 @@ func syncSystemMails(userID string) {
 
 		insertQuery := `INSERT INTO mailUsers (userid, mailid, status, startTime, endTime) 
 			VALUES (?, ?, 0, ?, ?)`
-		_, err := db.MySQLDB.Exec(insertQuery, userID, mailID, startTime, endTime)
+		_, err := db.MySQLDBGameWeb.Exec(insertQuery, userID, mailID, startTime, endTime)
 		if err != nil {
 			log.Logger.Errorf("Failed to insert mail for user %s, mail %d: %v", userID, mailID, err)
 		}

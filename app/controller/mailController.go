@@ -28,19 +28,41 @@ type MailDetailResponse struct {
 	Time    string `json:"time"`
 }
 
+// 通用请求结构体
+// 获取邮件列表请求
+type GetMailListRequest struct {
+	UserID string `json:"userid" binding:"required"`
+}
+
+// 获取邮件详情请求
+type GetMailDetailRequest struct {
+	UserID string `json:"userid" binding:"required"`
+}
+
+// 标记邮件已读请求
+type MarkMailAsReadRequest struct {
+	UserID string `json:"userid" binding:"required"`
+}
+
+// 领取邮件奖励请求
+type GetMailAwardRequest struct {
+	UserID string `json:"userid" binding:"required"`
+}
+
 // 获取邮件列表
 func GetMailList(c *gin.Context) {
-	userID := c.PostForm("userid")
-	if userID == "" {
+	var req GetMailListRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "userid is required",
+			"message": "Invalid request body",
+			"error":   err.Error(),
 		})
 		return
 	}
 
 	// 先从系统邮件表拉取未过期的邮件
-	syncSystemMails(userID)
+	syncSystemMails(req.UserID)
 
 	// 查询用户邮件列表
 	query := `SELECT mu.id, m.title, mu.status, mu.update_at 
@@ -49,9 +71,9 @@ func GetMailList(c *gin.Context) {
 			WHERE mu.userid = ? AND mu.status != 3 
 			ORDER BY mu.update_at DESC`
 
-	rows, err := db.MySQLDBGameWeb.Query(query, userID)
+	rows, err := db.MySQLDBGameWeb.Query(query, req.UserID)
 	if err != nil {
-		log.Logger.Errorf("Failed to query mail list for user %s: %v", userID, err)
+		log.Logger.Errorf("Failed to query mail list for user %s: %v", req.UserID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get mail list",
@@ -81,13 +103,21 @@ func GetMailList(c *gin.Context) {
 
 // 获取邮件详情
 func GetMailDetail(c *gin.Context) {
-	userID := c.PostForm("userid")
-	mailID := c.Param("id")
-
-	if userID == "" || mailID == "" {
+	var req GetMailDetailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "userid and mail id are required",
+			"message": "Invalid request body",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	mailID := c.Param("id")
+	if mailID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "mail id is required",
 		})
 		return
 	}
@@ -100,7 +130,7 @@ func GetMailDetail(c *gin.Context) {
 
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
-	err := db.MySQLDBGameWeb.QueryRow(query, userID, mailID).Scan(
+	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailID).Scan(
 		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
@@ -112,7 +142,7 @@ func GetMailDetail(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail detail for user %s, mail %s: %v", userID, mailID, err)
+			log.Logger.Errorf("Failed to query mail detail for user %s, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get mail detail",
@@ -132,13 +162,21 @@ func GetMailDetail(c *gin.Context) {
 
 // 标记邮件为已读
 func MarkMailAsRead(c *gin.Context) {
-	userID := c.PostForm("userid")
-	mailID := c.Param("id")
-
-	if userID == "" || mailID == "" {
+	var req MarkMailAsReadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "userid and mail id are required",
+			"message": "Invalid request body",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	mailID := c.Param("id")
+	if mailID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "mail id is required",
 		})
 		return
 	}
@@ -148,9 +186,9 @@ func MarkMailAsRead(c *gin.Context) {
 			SET status = 1, update_at = CURRENT_TIMESTAMP 
 			WHERE userid = ? AND id = ? AND status = 0`
 
-	result, err := db.MySQLDBGameWeb.Exec(query, userID, mailID)
+	result, err := db.MySQLDBGameWeb.Exec(query, req.UserID, mailID)
 	if err != nil {
-		log.Logger.Errorf("Failed to mark mail as read for user %s, mail %s: %v", userID, mailID, err)
+		log.Logger.Errorf("Failed to mark mail as read for user %s, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to mark mail as read",
@@ -176,13 +214,21 @@ func MarkMailAsRead(c *gin.Context) {
 
 // 领取邮件奖励
 func GetMailAward(c *gin.Context) {
-	userID := c.PostForm("userid")
-	mailID := c.Param("id")
-
-	if userID == "" || mailID == "" {
+	var req GetMailAwardRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "userid and mail id are required",
+			"message": "Invalid request body",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	mailID := c.Param("id")
+	if mailID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "mail id is required",
 		})
 		return
 	}
@@ -206,7 +252,7 @@ func GetMailAward(c *gin.Context) {
 			FROM mailUsers mu 
 			JOIN mails m ON mu.mailid = m.id 
 			WHERE mu.userid = ? AND mu.id = ? FOR UPDATE`
-	err = tx.QueryRow(query, userID, mailID).Scan(&awards, &mailStatus)
+	err = tx.QueryRow(query, req.UserID, mailID).Scan(&awards, &mailStatus)
 
 	if err != nil {
 		tx.Rollback()
@@ -216,7 +262,7 @@ func GetMailAward(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail award for user %s, mail %s: %v", userID, mailID, err)
+			log.Logger.Errorf("Failed to query mail award for user %s, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get award",
@@ -244,11 +290,11 @@ func GetMailAward(c *gin.Context) {
 	updateQuery := `UPDATE mailUsers 
 			SET status = 2, update_at = CURRENT_TIMESTAMP 
 			WHERE userid = ? AND id = ?`
-	_, err = tx.Exec(updateQuery, userID, mailID)
+	_, err = tx.Exec(updateQuery, req.UserID, mailID)
 
 	if err != nil {
 		tx.Rollback()
-		log.Logger.Errorf("Failed to update mail status for user %s, mail %s: %v", userID, mailID, err)
+		log.Logger.Errorf("Failed to update mail status for user %s, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",

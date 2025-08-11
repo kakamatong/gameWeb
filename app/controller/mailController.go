@@ -14,6 +14,7 @@ import (
 type MailListResponse struct {
 	ID     int64  `json:"id"`
 	Title  string `json:"title"`
+	MailID int64  `json:"mailid"`
 	Status int    `json:"status"`
 	Time   string `json:"time"`
 }
@@ -65,7 +66,7 @@ func GetMailList(c *gin.Context) {
 	syncSystemMails(req.UserID)
 
 	// 查询用户邮件列表
-	query := `SELECT mu.id, m.title, mu.status, mu.update_at 
+	query := `SELECT mu.id, m.title, mu.mailid, mu.status, mu.update_at 
 			FROM mailUsers mu 
 			JOIN mails m ON mu.mailid = m.id 
 			WHERE mu.userid = ? AND mu.status != 3 
@@ -87,7 +88,7 @@ func GetMailList(c *gin.Context) {
 	for rows.Next() {
 		var mail MailListResponse
 		var updateTime time.Time
-		if err := rows.Scan(&mail.ID, &mail.Title, &mail.Status, &updateTime); err != nil {
+		if err := rows.Scan(&mail.ID, &mail.Title, &mail.MailID, &mail.Status, &updateTime); err != nil {
 			log.Logger.Errorf("Failed to scan mail row: %v", err)
 			continue
 		}
@@ -114,6 +115,7 @@ func GetMailDetail(c *gin.Context) {
 	}
 
 	mailID := c.Param("id")
+	log.Logger.Infof("GetMailDetail mailID: %s", mailID)
 	if mailID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -131,7 +133,7 @@ func GetMailDetail(c *gin.Context) {
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
 	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailID).Scan(
-		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content, 
+		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
 

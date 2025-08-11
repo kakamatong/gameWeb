@@ -206,7 +206,7 @@ func MarkMailAsRead(c *gin.Context) {
 	// 更新邮件状态
 	query := `UPDATE mailUsers 
 			SET status = 1, update_at = CURRENT_TIMESTAMP 
-			WHERE userid = ? AND id = ? AND status = 0`
+			WHERE userid = ? AND mailid = ? AND status = 0`
 
 	result, err := db.MySQLDBGameWeb.Exec(query, req.UserID, mailID)
 	if err != nil {

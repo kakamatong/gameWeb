@@ -1,8 +1,6 @@
 package config
 
 import (
-	"gameWeb/log"
-
 	"github.com/spf13/viper"
 )
 
@@ -73,11 +71,11 @@ func InitConfig() {
 	viper.SetDefault("Log.Format", "text")
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("Failed to read config file: %v, using default values", err)
+		panic("Failed to read config file: " + err.Error())
 	}
 
 	// 绑定配置到结构体
 	if err := viper.Unmarshal(&AppConfig); err != nil {
-		log.Fatalf("Failed to unmarshal config: %v", err)
+		panic("Failed to unmarshal config: " + err.Error())
 	}
 }

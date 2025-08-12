@@ -13,7 +13,13 @@ import (
 
 func init() {
 	config.InitConfig()
-	log.InitZapLog() // 初始化zap日志系统
+
+	// 初始化日志系统，传递配置
+	log.InitZapLog(log.LogConfig{
+		Level:  config.AppConfig.Log.Level,
+		Path:   config.AppConfig.Log.Path,
+		Format: config.AppConfig.Log.Format,
+	})
 
 	// 初始化数据库连接
 	db.InitMySQL()

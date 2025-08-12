@@ -1,7 +1,6 @@
 package log
 
 import (
-	"gameWeb/config"
 	"os"
 	"path/filepath"
 
@@ -13,15 +12,17 @@ import (
 var Logger *zap.Logger
 var SugaredLogger *zap.SugaredLogger
 
-// InitZapLog 初始化zap日志系统
-func InitZapLog() {
-	// 从配置中获取日志设置
-	logPath := config.AppConfig.Log.Path
-	logLevel := config.AppConfig.Log.Level
-	logFormat := config.AppConfig.Log.Format
+// LogConfig 日志配置结构体
+type LogConfig struct {
+	Level  string
+	Path   string
+	Format string
+}
 
+// InitZapLog 初始化zap日志系统
+func InitZapLog(config LogConfig) {
 	// 创建日志目录
-	logDir := filepath.Dir(logPath)
+	logDir := filepath.Dir(config.Path)
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
 		err := os.MkdirAll(logDir, 0755)
 		if err != nil {
@@ -31,7 +32,7 @@ func InitZapLog() {
 
 	// 设置日志级别
 	var level zapcore.Level
-	switch logLevel {
+	switch config.Level {
 	case "debug":
 		level = zapcore.DebugLevel
 	case "info":
@@ -52,7 +53,7 @@ func InitZapLog() {
 
 	// 创建编码器
 	var encoder zapcore.Encoder
-	if logFormat == "json" {
+	if config.Format == "json" {
 		encoder = zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 	} else {
 		encoder = zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
@@ -60,7 +61,7 @@ func InitZapLog() {
 
 	// 创建滚动文件写入器
 	writer := &lumberjack.Logger{
-		Filename:   logPath,
+		Filename:   config.Path,
 		MaxSize:    100, // 单个文件最大100MB
 		MaxBackups: 7,   // 保留7个备份
 		MaxAge:     24,  // 保留24小时

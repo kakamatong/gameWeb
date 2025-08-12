@@ -1,7 +1,6 @@
 package middleware // 更新包名
 
 import (
-	"crypto/cipher"
 	"crypto/des"
 	"encoding/base64"
 	"encoding/hex"
@@ -124,7 +123,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 使用CBC模式解密（更安全的替代方案）
 		// 确保密文长度是8的倍数
 		if len(base64DecodedToken)%8 != 0 {
 			log.Errorf("Invalid ciphertext length: %d, must be multiple of 8", len(base64DecodedToken))
@@ -136,12 +134,12 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 创建CBC解密器
-		// 注意: 实际应用中应该使用安全的初始化向量(IV)，这里为了示例使用全零IV
-		iv := make([]byte, des.BlockSize)
-		mode := cipher.NewCBCDecrypter(desBlock, iv)
+		// 使用ECB模式解密（如果前8个字符正确但后面乱码，可能加密方使用了ECB模式）
+		// 注意：ECB模式不安全，但有些旧系统可能仍在使用
 		plaintext := make([]byte, len(base64DecodedToken))
-		mode.CryptBlocks(plaintext, base64DecodedToken)
+		for i := 0; i < len(base64DecodedToken); i += des.BlockSize {
+			desBlock.Decrypt(plaintext[i:i+des.BlockSize], base64DecodedToken[i:i+des.BlockSize])
+		}
 
 		// 去除ISO7816-4填充
 		// ISO7816-4填充规则: 第一个字节是0x80，后面跟着0个或多个0x00字节
@@ -165,6 +163,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		plaintext = plaintext[:paddingIndex]
 
+		log.Info("DES decrypted data length: ", len(plaintext))
 		log.Info("DES decrypted data: ", string(plaintext))
 
 		// 可以将解密后的信息存储在上下文中

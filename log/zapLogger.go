@@ -62,9 +62,9 @@ func InitZapLog(config LogConfig) {
 	// 创建滚动文件写入器
 	writer := &lumberjack.Logger{
 		Filename:   config.Path,
-		MaxSize:    100, // 单个文件最大100MB
-		MaxBackups: 7,   // 保留7个备份
-		MaxAge:     24,  // 保留24小时
+		MaxSize:    100,  // 单个文件最大100MB
+		MaxBackups: 5,    // 保留5个备份
+		MaxAge:     5,    // 保留5天
 		Compress:   false,
 	}
 

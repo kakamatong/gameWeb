@@ -6,6 +6,8 @@ import (
 	"gameWeb/log"
 	"gameWeb/routes"
 	"time"
+	"path/filepath"
+	"fmt"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -17,7 +19,7 @@ func init() {
 	// 初始化日志系统，传递配置
 	log.InitZapLog(log.LogConfig{
 		Level:  config.AppConfig.Log.Level,
-		Path:   config.AppConfig.Log.Path,
+		Path:   generateLogFilePath(config.AppConfig.Log.Path, config.AppConfig.Log.DateFormat),
 		Format: config.AppConfig.Log.Format,
 	})
 
@@ -53,4 +55,20 @@ func main() {
 	if err := router.Run(":" + serverPort); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// 添加生成带日期的日志文件名函数
+func generateLogFilePath(basePath string, dateFormat string) string {
+    if dateFormat == "" {
+        dateFormat = "2006-01-02"
+    }
+    // 获取当前日期
+    currentDate := time.Now().Format(dateFormat)
+    // 提取文件名和扩展名
+    dir := filepath.Dir(basePath)
+    filename := filepath.Base(basePath)
+    nameWithoutExt := filename[:len(filename)-len(filepath.Ext(filename))]
+    ext := filepath.Ext(filename)
+    // 生成带日期的文件名
+    return filepath.Join(dir, fmt.Sprintf("%s_%s%s", nameWithoutExt, currentDate, ext))
 }

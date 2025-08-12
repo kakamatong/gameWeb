@@ -33,9 +33,10 @@ var AppConfig struct {
 		Database int
 	}
 	Log struct {
-		Level  string
-		Path   string
-		Format string
+		Level      string
+		Path       string
+		Format     string
+		DateFormat string // 添加日期格式配置
 	}
 }
 
@@ -68,7 +69,8 @@ func InitConfig() {
 	viper.SetDefault("Redis.Database", 0)
 	viper.SetDefault("Log.Level", "info")
 	viper.SetDefault("Log.Path", "logs/game.log")
-	viper.SetDefault("Log.Format", "text")
+	viper.SetDefault("Log.Format", "console")
+	viper.SetDefault("Log.DateFormat", "2006-01-02") // 添加默认日期格式
 
 	if err := viper.ReadInConfig(); err != nil {
 		panic("Failed to read config file: " + err.Error())

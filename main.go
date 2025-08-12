@@ -37,8 +37,11 @@ func main() {
 	// 创建Gin引擎
 	router := gin.New()
 
-	// 配置gin使用与zap相同的日志写入器
-	router.Use(gin.LoggerWithWriter(log.LogWriter))
+	// 删除这行代码
+	// router.Use(gin.LoggerWithWriter(log.LogWriter))
+	
+	// 使用自定义的gin logger中间件
+	router.Use(log.GinLogger())
 
 	// 添加CORS中间件
 	router.Use(cors.New(cors.Config{

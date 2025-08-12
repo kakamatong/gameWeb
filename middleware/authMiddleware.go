@@ -1,6 +1,8 @@
 package middleware // 更新包名
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
@@ -67,36 +69,39 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// 获取subid和token
 		svrsubid := userInfo["subid"]
 		svrtoken := userInfo["token"]
 
-		// 获取存储的token
-		// storedToken, exists := userInfo["token"]
-		// if !exists || storedToken == "" {
-		// 	log.Errorf("Token not found in user info for user: %s", userid)
-		// 	c.JSON(http.StatusUnauthorized, gin.H{
-		// 		"code":    401,
-		// 		"message": "Invalid or expired token",
-		// 	})
-		// 	c.Abort()
-		// 	return
-		// }
+		// 对svrtoken进行hex解码
+		hexDecodedToken, err := hex.DecodeString(svrtoken)
+		if err != nil {
+			log.Errorf("Failed to hex decode svrtoken: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Invalid or expired token",
+			})
+			c.Abort()
+			return
+		}
+		log.Info("Hex decoded svrtoken: ", string(hexDecodedToken))
 
-		// // 比较token是否一致
-		// if storedToken != token {
-		// 	log.Errorf("Token mismatch for user: %s", userid)
-		// 	c.JSON(http.StatusUnauthorized, gin.H{
-		// 		"code":    401,
-		// 		"message": "Invalid or expired token",
-		// 	})
-		// 	c.Abort()
-		// 	return
-		// }
-
-		// 可以将用户信息存储在上下文中供后续使用
-		// for k, v := range userInfo {
-		//	 c.Set(k, v)
-		// }
+		// 对token进行base64解码
+		base64DecodedToken, err := base64.StdEncoding.DecodeString(token)
+		if err != nil {
+			// 尝试使用URL安全的base64解码
+			base64DecodedToken, err = base64.URLEncoding.DecodeString(token)
+			if err != nil {
+				log.Errorf("Failed to base64 decode token: %v", err)
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"code":    401,
+					"message": "Invalid or expired token",
+				})
+				c.Abort()
+				return
+			}
+		}
+		log.Info("Base64 decoded token: ", string(base64DecodedToken))
 
 		// 验签通过，继续处理请求
 		c.Next()

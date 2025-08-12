@@ -32,14 +32,14 @@ func init() {
 func main() {
 
 	// 设置gin为发布模式
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 
 	// 创建Gin引擎
 	router := gin.New()
 
 	// 删除这行代码
 	// router.Use(gin.LoggerWithWriter(log.LogWriter))
-	
+
 	// 使用自定义的gin logger中间件
 	router.Use(log.GinLogger())
 

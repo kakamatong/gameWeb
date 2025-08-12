@@ -3,16 +3,17 @@ package main
 import (
 	"gameWeb/config"
 	"gameWeb/db"
+	"gameWeb/log"
 	"gameWeb/routes"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func init() {
 	config.InitConfig()
+	log.InitZapLog() // 初始化zap日志系统
 
 	// 初始化数据库连接
 	db.InitMySQL()
@@ -44,6 +45,6 @@ func main() {
 	// 启动服务器
 	serverPort := config.AppConfig.Server.Port
 	if err := router.Run(":" + serverPort); err != nil {
-		logrus.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }

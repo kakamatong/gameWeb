@@ -4,11 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"gameWeb/config"
+	"gameWeb/log"
 
 	// Add the MySQL driver import
 	_ "github.com/go-sql-driver/mysql"
-
-	"github.com/sirupsen/logrus"
 )
 
 var MySQLDB *sql.DB
@@ -32,15 +31,15 @@ func InitMySQL() {
 	var err error
 	MySQLDB, err = sql.Open("mysql", dsn)
 	if err != nil {
-		logrus.Fatalf("Failed to open MySQL connection: %v", err)
+		log.Fatalf("Failed to open MySQL connection: %v", err)
 	}
 
 	// 测试连接
 	if err := MySQLDB.Ping(); err != nil {
-		logrus.Fatalf("Failed to ping MySQL: %v", err)
+		log.Fatalf("Failed to ping MySQL: %v", err)
 	}
 
-	logrus.Info("Successfully connected to MySQL")
+	log.Info("Successfully connected to MySQL")
 
 	// 设置连接池参数
 	MySQLDB.SetMaxOpenConns(100)
@@ -66,15 +65,15 @@ func InitMySQLGameWeb() {
 	var err error
 	MySQLDBGameWeb, err = sql.Open("mysql", dsn)
 	if err != nil {
-		logrus.Fatalf("Failed to open MySQLGameWeb connection: %v", err)
+		log.Fatalf("Failed to open MySQLGameWeb connection: %v", err)
 	}
 
 	// 测试连接
 	if err := MySQLDBGameWeb.Ping(); err != nil {
-		logrus.Fatalf("Failed to ping MySQLGameWeb: %v", err)
+		log.Fatalf("Failed to ping MySQLGameWeb: %v", err)
 	}
 
-	logrus.Info("Successfully connected to MySQLGameWeb")
+	log.Info("Successfully connected to MySQLGameWeb")
 
 	// 设置连接池参数
 	MySQLDBGameWeb.SetMaxOpenConns(100)

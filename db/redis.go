@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"gameWeb/config"
+	"gameWeb/log"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/sirupsen/logrus"
 )
 
 var RedisClient *redis.Client
@@ -27,10 +27,10 @@ func InitRedis() {
 	// 测试连接
 	_, err := RedisClient.Ping(ctx).Result()
 	if err != nil {
-		logrus.Fatalf("Failed to connect to Redis: %v", err)
+		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
-	logrus.Info("Successfully connected to Redis")
+	log.Info("Successfully connected to Redis")
 }
 
 // SetRedis 设置Redis键值对

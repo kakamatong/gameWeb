@@ -4,11 +4,11 @@ package controller
 import (
 	"encoding/json"
 	"gameWeb/db"
+	"gameWeb/log"
 	"net/http"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 // 定义服务节点结构体
@@ -39,7 +39,7 @@ func GetAuthGameList(c *gin.Context) {
 	// 从Redis获取clusterConfig
 	clusterConfigStr, err := db.GetRedis("clusterConfig")
 	if err != nil {
-		logrus.Errorf("Failed to get clusterConfig from Redis: %v", err)
+		log.Errorf("Failed to get clusterConfig from Redis: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get cluster configuration",
@@ -60,7 +60,7 @@ func GetAuthGameList(c *gin.Context) {
 	// 解析JSON
 	var clusterConfig ClusterConfig
 	if err := json.Unmarshal([]byte(clusterConfigStr), &clusterConfig); err != nil {
-		logrus.Errorf("Failed to parse clusterConfig: %v", err)
+		log.Errorf("Failed to parse clusterConfig: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to parse cluster configuration",

@@ -3,12 +3,12 @@ package controller
 import (
 	"database/sql"
 	"gameWeb/db"
-	"gameWeb/log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 // 邮件列表响应结构体
@@ -76,7 +76,7 @@ func GetMailList(c *gin.Context) {
 
 	rows, err := db.MySQLDBGameWeb.Query(query, req.UserID)
 	if err != nil {
-		log.Logger.Errorf("Failed to query mail list for user %d: %v", req.UserID, err)
+		logrus.Errorf("Failed to query mail list for user %d: %v", req.UserID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get mail list",
@@ -91,7 +91,7 @@ func GetMailList(c *gin.Context) {
 		var mail MailListResponse
 		var updateTime time.Time
 		if err := rows.Scan(&mail.ID, &mail.Title, &mail.MailID, &mail.Status, &updateTime); err != nil {
-			log.Logger.Errorf("Failed to scan mail row: %v", err)
+			logrus.Errorf("Failed to scan mail row: %v", err)
 			continue
 		}
 		mail.Time = updateTime.Format("2006-01-02 15:04:05")
@@ -117,7 +117,7 @@ func GetMailDetail(c *gin.Context) {
 	}
 
 	mailID := c.Param("id")
-	log.Logger.Infof("GetMailDetail mailID: %s", mailID)
+	logrus.Infof("GetMailDetail mailID: %s", mailID)
 	if mailID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
@@ -134,7 +134,7 @@ func GetMailDetail(c *gin.Context) {
 		return
 	}
 
-	log.Logger.Infof("GetMailDetail mailIDInt: %d", mailIDInt)
+	logrus.Infof("GetMailDetail mailIDInt: %d", mailIDInt)
 	// 查询邮件详情
 	query := `SELECT mu.id, m.title, m.content, m.awards, mu.status, mu.update_at 
 			FROM mailUsers mu 
@@ -143,12 +143,12 @@ func GetMailDetail(c *gin.Context) {
 
 	var mailDetail MailDetailResponse
 	var updateTime time.Time
-	log.Logger.Infof("GetMailDetail query: %d %d", req.UserID, mailIDInt)
+	logrus.Infof("GetMailDetail query: %d %d", req.UserID, mailIDInt)
 	err := db.MySQLDBGameWeb.QueryRow(query, req.UserID, mailIDInt).Scan(
 		&mailDetail.ID, &mailDetail.Title, &mailDetail.Content,
 		&mailDetail.Awards, &mailDetail.Status, &updateTime,
 	)
-	log.Logger.Infof("GetMailDetail err: %v", err)
+	logrus.Infof("GetMailDetail err: %v", err)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -157,7 +157,7 @@ func GetMailDetail(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail detail for user %d, mail %s: %v", req.UserID, mailID, err)
+			logrus.Errorf("Failed to query mail detail for user %d, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get mail detail",
@@ -210,7 +210,7 @@ func MarkMailAsRead(c *gin.Context) {
 
 	result, err := db.MySQLDBGameWeb.Exec(query, req.UserID, mailID)
 	if err != nil {
-		log.Logger.Errorf("Failed to mark mail as read for user %d, mail %s: %v", req.UserID, mailID, err)
+		logrus.Errorf("Failed to mark mail as read for user %d, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to mark mail as read",
@@ -258,7 +258,7 @@ func GetMailAward(c *gin.Context) {
 	// 开始事务
 	tx, err := db.MySQLDBGameWeb.Begin()
 	if err != nil {
-		log.Logger.Errorf("Failed to start transaction: %v", err)
+		logrus.Errorf("Failed to start transaction: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",
@@ -284,7 +284,7 @@ func GetMailAward(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Logger.Errorf("Failed to query mail award for user %d, mail %s: %v", req.UserID, mailID, err)
+			logrus.Errorf("Failed to query mail award for user %d, mail %s: %v", req.UserID, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get award",
@@ -316,7 +316,7 @@ func GetMailAward(c *gin.Context) {
 
 	if err != nil {
 		tx.Rollback()
-		log.Logger.Errorf("Failed to update mail status for user %d, mail %s: %v", req.UserID, mailID, err)
+		logrus.Errorf("Failed to update mail status for user %d, mail %s: %v", req.UserID, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",
@@ -328,7 +328,7 @@ func GetMailAward(c *gin.Context) {
 	// 提交事务
 	err = tx.Commit()
 	if err != nil {
-		log.Logger.Errorf("Failed to commit transaction: %v", err)
+		logrus.Errorf("Failed to commit transaction: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",
@@ -358,7 +358,7 @@ func syncSystemMails(userID int64) {
 
 	rows, err := db.MySQLDBGameWeb.Query(query, now, userID)
 	if err != nil {
-		log.Logger.Errorf("Failed to query system mails: %v", err)
+		logrus.Errorf("Failed to query system mails: %v", err)
 		return
 	}
 	defer rows.Close()
@@ -368,7 +368,7 @@ func syncSystemMails(userID int64) {
 		var mailID int64
 		var startTime, endTime time.Time
 		if err := rows.Scan(&mailID, &startTime, &endTime); err != nil {
-			log.Logger.Errorf("Failed to scan system mail row: %v", err)
+			logrus.Errorf("Failed to scan system mail row: %v", err)
 			continue
 		}
 
@@ -376,7 +376,7 @@ func syncSystemMails(userID int64) {
 			VALUES (?, ?, 0, ?, ?)`
 		_, err := db.MySQLDBGameWeb.Exec(insertQuery, userID, mailID, startTime, endTime)
 		if err != nil {
-			log.Logger.Errorf("Failed to insert mail for user %d, mail %d: %v", userID, mailID, err)
+			logrus.Errorf("Failed to insert mail for user %d, mail %d: %v", userID, mailID, err)
 		}
 	}
 }

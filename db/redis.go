@@ -42,3 +42,8 @@ func SetRedis(key string, value interface{}, expiration time.Duration) error {
 func GetRedis(key string) (string, error) {
 	return RedisClient.Get(ctx, key).Result()
 }
+
+// HGetAllRedis 获取哈希表中所有字段和值
+func HGetAllRedis(key string) (map[string]string, error) {
+	return RedisClient.HGetAll(ctx, key).Result()
+}

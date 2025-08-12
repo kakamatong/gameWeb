@@ -1,6 +1,7 @@
 package middleware // 更新包名
 
 import (
+	"gameWeb/log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,9 +15,10 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 检查签名和时间戳是否存在
 		if signature == "" {
+			log.Errorf("Missing signature")
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"code":    401,
-				"message": "Missing signature or timestamp",
+				"message": "Missing signature",
 			})
 			c.Abort()
 			return

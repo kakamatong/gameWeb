@@ -1,6 +1,7 @@
 package log
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 
@@ -11,6 +12,7 @@ import (
 
 var Logger *zap.Logger
 var SugaredLogger *zap.SugaredLogger
+var LogWriter io.Writer // 导出日志写入器
 
 // LogConfig 日志配置结构体
 type LogConfig struct {
@@ -67,6 +69,8 @@ func InitZapLog(config LogConfig) {
 		MaxAge:     5,    // 保留5天
 		Compress:   false,
 	}
+
+	LogWriter = writer // 保存写入器引用
 
 	// 创建核心
 	core := zapcore.NewCore(

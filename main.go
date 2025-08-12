@@ -34,8 +34,11 @@ func main() {
 	// 设置gin为发布模式
 	//gin.SetMode(gin.ReleaseMode)
 
-	// 创建Gin引擎，禁用默认日志
+	// 创建Gin引擎
 	router := gin.New()
+
+	// 配置gin使用与zap相同的日志写入器
+	router.Use(gin.LoggerWithWriter(log.LogWriter))
 
 	// 添加CORS中间件
 	router.Use(cors.New(cors.Config{
@@ -57,7 +60,7 @@ func main() {
 	}
 }
 
-// 添加生成带日期的日志文件名函数
+// 添加生成带日期的文件名函数
 func generateLogFilePath(basePath string, dateFormat string) string {
 	if dateFormat == "" {
 		dateFormat = "2006-01-02"

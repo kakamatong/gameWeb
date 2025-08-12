@@ -4,13 +4,22 @@ import (
 	"crypto/des"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+// 定义存储JSON数据的结构体
+type TokenInfo struct {
+	Userid int64 `json:"userid"`
+	Subid  int64 `json:"subid"`
+	Time   int64 `json:"time"`
+}
 
 // AuthMiddleware 生成验签中间件
 func AuthMiddleware() gin.HandlerFunc {
@@ -72,6 +81,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 获取subid和token
 		//svrsubid := userInfo["subid"]
+		svrsubid := userInfo["subid"] // 取消注释以获取subid
 		svrtoken := userInfo["token"]
 
 		// 对svrtoken进行hex解码
@@ -166,9 +176,61 @@ func AuthMiddleware() gin.HandlerFunc {
 		log.Info("DES decrypted data length: ", len(plaintext))
 		log.Info("DES decrypted data: ", string(plaintext))
 
+		// JSON解析plaintext数据
+		var tokenInfo TokenInfo
+		err = json.Unmarshal(plaintext, &tokenInfo)
+		if err != nil {
+			log.Errorf("Failed to unmarshal token info: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Invalid token format",
+			})
+			c.Abort()
+			return
+		}
+
+		// 转换请求头中的userid为int64类型
+		reqUserid, err := strconv.ParseInt(userid, 10, 64)
+		if err != nil {
+			log.Errorf("Invalid userid format: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Invalid userid format",
+			})
+			c.Abort()
+			return
+		}
+
+		// 转换Redis中的subid为int64类型
+		svrSubid, err := strconv.ParseInt(svrsubid, 10, 64)
+		if err != nil {
+			log.Errorf("Invalid subid format from Redis: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Invalid token data",
+			})
+			c.Abort()
+			return
+		}
+
+		// 比较解析出的userid和subid与上面的数据
+		if tokenInfo.Userid != reqUserid || tokenInfo.Subid != svrSubid {
+			log.Errorf("Token validation failed: expected userid=%d, subid=%d; got userid=%d, subid=%d",
+				reqUserid, svrSubid, tokenInfo.Userid, tokenInfo.Subid)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Invalid or expired token",
+			})
+			c.Abort()
+			return
+		}
+
+		log.Info("Token validated successfully for user: ", userid)
+
 		// 可以将解密后的信息存储在上下文中
-		// c.Set("subid", svrsubid)
-		// c.Set("decryptedData", string(plaintext))
+		c.Set("subid", tokenInfo.Subid)
+		c.Set("userid", tokenInfo.Userid)
+		c.Set("tokenTime", tokenInfo.Time)
 
 		// 验签通过，继续处理请求
 		c.Next()

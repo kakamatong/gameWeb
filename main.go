@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/log"
 	"gameWeb/routes"
-	"time"
 	"path/filepath"
-	"fmt"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -32,7 +32,7 @@ func init() {
 func main() {
 
 	// 设置gin为发布模式
-	gin.SetMode(gin.ReleaseMode)
+	//gin.SetMode(gin.ReleaseMode)
 
 	// 创建Gin引擎，禁用默认日志
 	router := gin.New()
@@ -59,16 +59,16 @@ func main() {
 
 // 添加生成带日期的日志文件名函数
 func generateLogFilePath(basePath string, dateFormat string) string {
-    if dateFormat == "" {
-        dateFormat = "2006-01-02"
-    }
-    // 获取当前日期
-    currentDate := time.Now().Format(dateFormat)
-    // 提取文件名和扩展名
-    dir := filepath.Dir(basePath)
-    filename := filepath.Base(basePath)
-    nameWithoutExt := filename[:len(filename)-len(filepath.Ext(filename))]
-    ext := filepath.Ext(filename)
-    // 生成带日期的文件名
-    return filepath.Join(dir, fmt.Sprintf("%s_%s%s", nameWithoutExt, currentDate, ext))
+	if dateFormat == "" {
+		dateFormat = "2006-01-02"
+	}
+	// 获取当前日期
+	currentDate := time.Now().Format(dateFormat)
+	// 提取文件名和扩展名
+	dir := filepath.Dir(basePath)
+	filename := filepath.Base(basePath)
+	nameWithoutExt := filename[:len(filename)-len(filepath.Ext(filename))]
+	ext := filepath.Ext(filename)
+	// 生成带日期的文件名
+	return filepath.Join(dir, fmt.Sprintf("%s_%s%s", nameWithoutExt, currentDate, ext))
 }

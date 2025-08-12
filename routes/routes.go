@@ -2,7 +2,7 @@ package routes
 
 import (
     "gameWeb/app/controller"
-    "gameWeb/log"
+    "gameWeb/middleware"  // 更新导入路径
     "github.com/gin-gonic/gin"
 )
 
@@ -13,14 +13,14 @@ func RegisterRoutes(router *gin.Engine) {
     {
         // 游戏相关路由 - 需要验签
         game := api.Group("/game")
-        game.Use(log.AuthMiddleware())
+        game.Use(middleware.AuthMiddleware())  // 更新中间件引用
         {
             game.POST("/authlist", controller.GetAuthGameList)
         }
 
         // 邮件相关路由 - 需要验签
         mail := api.Group("/mail")
-        mail.Use(log.AuthMiddleware())
+        mail.Use(middleware.AuthMiddleware())  // 更新中间件引用
         {
             mail.POST("/list", controller.GetMailList)
             mail.POST("/detail/:id", controller.GetMailDetail)

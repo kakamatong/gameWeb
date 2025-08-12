@@ -1,39 +1,40 @@
 package routes
 
 import (
-	"gameWeb/app/controller"
-
-	"github.com/gin-gonic/gin"
+    "gameWeb/app/controller"
+    "gameWeb/log"
+    "github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes 注册路由
 func RegisterRoutes(router *gin.Engine) {
-	// API分组
-	api := router.Group("/api")
-	{
-		// 游戏相关路由
-		game := api.Group("/game")
-		{
-			game.POST("/authlist", controller.GetAuthGameList)
-		}
+    // API分组
+    api := router.Group("/api")
+    {
+        // 游戏相关路由 - 需要验签
+        game := api.Group("/game")
+        game.Use(log.AuthMiddleware())
+        {
+            game.POST("/authlist", controller.GetAuthGameList)
+        }
 
-		// 邮件相关路由
-		mail := api.Group("/mail")
-		{
-			mail.POST("/list", controller.GetMailList)
-			mail.POST("/detail/:id", controller.GetMailDetail)
-			mail.POST("/read/:id", controller.MarkMailAsRead)
-			mail.POST("/getaward/:id", controller.GetMailAward)
-		}
+        // 邮件相关路由 - 需要验签
+        mail := api.Group("/mail")
+        mail.Use(log.AuthMiddleware())
+        {
+            mail.POST("/list", controller.GetMailList)
+            mail.POST("/detail/:id", controller.GetMailDetail)
+            mail.POST("/read/:id", controller.MarkMailAsRead)
+            mail.POST("/getaward/:id", controller.GetMailAward)
+        }
 
-		// 用户相关路由
-		// user := api.Group("/user")
-		// {
-		//	user.GET("/info", controller.GetUserInfo)
-		//	user.POST("/login", controller.UserLogin)
-		//	user.POST("/register", controller.UserRegister)
-		// }
-
-		// 其他路由可以根据需要添加
-	}
+        // 用户相关路由 - 未注释部分可以添加验签
+        // user := api.Group("/user")
+        // user.Use(log.AuthMiddleware("your-secret-key", 300))
+        // {
+        //     user.GET("/info", controller.GetUserInfo)
+        //     user.POST("/login", controller.UserLogin)
+        //     user.POST("/register", controller.UserRegister)
+        // }
+    }
 }

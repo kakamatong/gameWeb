@@ -275,7 +275,7 @@ func AuthMiddlewareByJWT() gin.HandlerFunc {
 
 		// 提取token
 		tokenString := auth[7:]
-
+		log.Info("JWT token: ", tokenString)
 		// 3. 解析和验证JWT token
 		secretKey := []byte(config.AppConfig.JWT.SecretKey)
 		token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {

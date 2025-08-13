@@ -20,7 +20,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 		// 邮件相关路由 - 需要验签
 		mail := api.Group("/mail")
-		mail.Use(middleware.AuthMiddleware()) // 更新中间件引用
+		mail.Use(middleware.AuthMiddlewareByJWT()) // 更新中间件引用
 		{
 			mail.POST("/list", controller.GetMailList)
 			mail.POST("/detail/:id", controller.GetMailDetail)

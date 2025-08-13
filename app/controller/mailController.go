@@ -294,6 +294,15 @@ func GetMailAward(c *gin.Context) {
 		return
 	}
 
+	if awards == "" {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "Mail awards is empty",
+		})
+		return
+	}
+
 	// 检查邮件状态
 	if mailStatus == 2 {
 		tx.Rollback()

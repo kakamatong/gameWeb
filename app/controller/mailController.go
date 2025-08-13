@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql"
+	"encoding/json"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
@@ -270,9 +271,9 @@ func GetMailAward(c *gin.Context) {
 	var awards string
 	var mailStatus int
 	query := `SELECT m.awards, mu.status 
-			FROM mailUsers mu 
-			JOIN mails m ON mu.mailid = m.id 
-			WHERE mu.userid = ? AND mu.mailid = ? FOR UPDATE`
+            FROM mailUsers mu 
+            JOIN mails m ON mu.mailid = m.id 
+            WHERE mu.userid = ? AND mu.mailid = ? FOR UPDATE`
 	err = tx.QueryRow(query, userid, mailID).Scan(&awards, &mailStatus)
 
 	if err != nil {
@@ -303,14 +304,119 @@ func GetMailAward(c *gin.Context) {
 		return
 	}
 
-	// TODO: 发放奖励逻辑
-	// 这里应该根据awards字段的内容，给用户发放相应的奖励
-	// 例如：解析JSON格式的awards，然后更新用户的游戏数据
+	// 解析奖励数据
+	var awardData struct {
+		Props []struct {
+			Id  int `json:"id"`
+			Cnt int `json:"cnt"`
+		} `json:"props"`
+	}
+
+	if err = json.Unmarshal([]byte(awards), &awardData); err != nil {
+		tx.Rollback()
+		log.Errorf("Failed to parse awards data: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to parse awards",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// 开始发奖，使用主数据库连接
+	userIDInt, ok := userid.(int64)
+	if !ok {
+		tx.Rollback()
+		log.Errorf("Invalid userid type: %T", userid)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Invalid userid type",
+		})
+		return
+	}
+
+	// 使用主数据库的事务
+	mainTx, err := db.MySQLDB.Begin()
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Failed to start main database transaction: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to start transaction",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// 发放每个奖励
+	for _, prop := range awardData.Props {
+		// 检查是否已有记录
+		var currentCount int64
+		checkQuery := `SELECT richNums FROM userRiches WHERE userid = ? AND richType = ?`
+		err = mainTx.QueryRow(checkQuery, userIDInt, prop.Id).Scan(&currentCount)
+
+		if err != nil && err != sql.ErrNoRows {
+			tx.Rollback()
+			mainTx.Rollback()
+			log.Errorf("Failed to check user riches: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to check user riches",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		// 更新或插入记录
+		if err == sql.ErrNoRows {
+			// 插入新记录
+			insertQuery := `INSERT INTO userRiches (userid, richType, richNums) VALUES (?, ?, ?)`
+			_, err = mainTx.Exec(insertQuery, userIDInt, prop.Id, prop.Cnt)
+			if err != nil {
+				tx.Rollback()
+				mainTx.Rollback()
+				log.Errorf("Failed to insert user riches: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    500,
+					"message": "Failed to insert user riches",
+					"error":   err.Error(),
+				})
+				return
+			}
+		} else {
+			// 更新现有记录
+			updateQuery := `UPDATE userRiches SET richNums = richNums + ? WHERE userid = ? AND richType = ?`
+			_, err = mainTx.Exec(updateQuery, prop.Cnt, userIDInt, prop.Id)
+			if err != nil {
+				tx.Rollback()
+				mainTx.Rollback()
+				log.Errorf("Failed to update user riches: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    500,
+					"message": "Failed to update user riches",
+					"error":   err.Error(),
+				})
+				return
+			}
+		}
+	}
+
+	// 提交主数据库事务
+	if err = mainTx.Commit(); err != nil {
+		tx.Rollback()
+		log.Errorf("Failed to commit main database transaction: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Failed to commit transaction",
+			"error":   err.Error(),
+		})
+		return
+	}
 
 	// 更新邮件状态为已领取
 	updateQuery := `UPDATE mailUsers 
-			SET status = 2, update_at = CURRENT_TIMESTAMP 
-			WHERE userid = ? AND mailid = ?`
+            SET status = 2, update_at = CURRENT_TIMESTAMP 
+            WHERE userid = ? AND mailid = ?`
 	_, err = tx.Exec(updateQuery, userid, mailID)
 
 	if err != nil {

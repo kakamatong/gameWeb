@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // TokenInfo 定义存储JSON数据的结构体
@@ -229,6 +232,100 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("subid", tokenInfo.Subid)
 		c.Set("userid", tokenInfo.Userid)
 		c.Set("tokenTime", tokenInfo.Time)
+
+		// 验签通过，继续处理请求
+		c.Next()
+	}
+}
+
+// JWTClaims 定义JWT声明结构体
+type JWTClaims struct {
+	Userid    int64  `json:"userid"`
+	Channelid string `json:"channelid"`
+	jwt.RegisteredClaims
+}
+
+// AuthMiddlewareByJWT 基于JWT的认证中间件（简化版，无需Redis验证）
+func AuthMiddlewareByJWT() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. 从请求头获取认证信息
+		auth := c.GetHeader("Authorization")
+
+		// 验证必要头信息是否存在
+		if auth == "" {
+			log.Errorf("缺少Authorization")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "缺少Authorization",
+			})
+			c.Abort()
+			return
+		}
+
+		// 2. 验证token格式
+		if !strings.HasPrefix(auth, "Bearer ") {
+			log.Errorf("Authorization格式无效")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "无效的Authorization格式",
+			})
+			c.Abort()
+			return
+		}
+
+		// 提取token
+		tokenString := auth[7:]
+
+		// 3. 解析和验证JWT token
+		secretKey := []byte(config.AppConfig.JWT.SecretKey)
+		token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+			// 验证签名算法
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return secretKey, nil
+		})
+
+		if err != nil {
+			log.Errorf("JWT解析失败: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "无效或过期的token",
+				"error":   err.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		// 验证token是否有效
+		if !token.Valid {
+			log.Errorf("token无效")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "无效的token",
+			})
+			c.Abort()
+			return
+		}
+
+		// 提取claims
+		claims, ok := token.Claims.(*JWTClaims)
+		if !ok {
+			log.Errorf("无法提取JWT claims")
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "无效的token格式",
+			})
+			c.Abort()
+			return
+		}
+
+		// 4. 将验证后的信息存储在上下文中
+		c.Set("userid", claims.Userid)
+		c.Set("channelid", claims.Channelid)
+		c.Set("tokenTime", claims.IssuedAt.Unix())
+
+		log.Info("用户JWT验证成功: userid=", claims.Userid, ", channelid=", claims.Channelid)
 
 		// 验签通过，继续处理请求
 		c.Next()

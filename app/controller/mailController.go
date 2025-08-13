@@ -3,6 +3,7 @@ package controller
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
@@ -231,6 +232,9 @@ func MarkMailAsRead(c *gin.Context) {
 
 // 领取邮件奖励
 func GetMailAward(c *gin.Context) {
+	// 使用 Gin 上下文的 Request Context
+	ctx := c.Request.Context()
+
 	userid, b := c.Get("userid")
 	if !b {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -248,6 +252,47 @@ func GetMailAward(c *gin.Context) {
 		})
 		return
 	}
+
+	// 生成锁键，使用用户ID和邮件ID确保唯一性
+	userIDInt, ok := userid.(int64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Invalid userid type",
+		})
+		return
+	}
+	lockKey := fmt.Sprintf("mail_award_lock:%d:%s", userIDInt, mailID)
+	lockValue := fmt.Sprintf("%d", time.Now().UnixNano())
+	lockExpire := 5 * time.Second
+
+	// 尝试获取Redis锁 - 使用 Gin 上下文
+	success, err := db.RedisClient.SetNX(ctx, lockKey, lockValue, lockExpire).Result()
+	if err != nil {
+		log.Errorf("Failed to acquire Redis lock: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "System busy, please try again later",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	if !success {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"code":    429,
+			"message": "Operation too frequent, please try again later",
+		})
+		return
+	}
+
+	// 确保函数结束时释放锁
+	defer func() {
+		// 使用Lua脚本确保只有持有锁的客户端才能释放锁
+		script := `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end`
+		// 使用 Gin 上下文
+		db.RedisClient.Eval(ctx, script, []string{lockKey}, lockValue)
+	}()
 
 	// 开始事务
 	tx, err := db.MySQLDBGameWeb.Begin()
@@ -322,18 +367,6 @@ func GetMailAward(c *gin.Context) {
 			"code":    500,
 			"message": "Failed to parse awards",
 			"error":   err.Error(),
-		})
-		return
-	}
-
-	// 开始发奖，使用主数据库连接
-	userIDInt, ok := userid.(int64)
-	if !ok {
-		tx.Rollback()
-		log.Errorf("Invalid userid type: %T", userid)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    500,
-			"message": "Invalid userid type",
 		})
 		return
 	}

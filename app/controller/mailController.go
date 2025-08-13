@@ -236,12 +236,11 @@ func MarkMailAsRead(c *gin.Context) {
 
 // 领取邮件奖励
 func GetMailAward(c *gin.Context) {
-	var req GetMailAwardRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	userid, b := c.Get("userid")
+	if !b {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "Invalid request body",
-			"error":   err.Error(),
+			"message": "userid is required",
 		})
 		return
 	}
@@ -273,8 +272,8 @@ func GetMailAward(c *gin.Context) {
 	query := `SELECT m.awards, mu.status 
 			FROM mailUsers mu 
 			JOIN mails m ON mu.mailid = m.id 
-			WHERE mu.userid = ? AND mu.id = ? FOR UPDATE`
-	err = tx.QueryRow(query, req.UserID, mailID).Scan(&awards, &mailStatus)
+			WHERE mu.userid = ? AND mu.mailid = ? FOR UPDATE`
+	err = tx.QueryRow(query, userid, mailID).Scan(&awards, &mailStatus)
 
 	if err != nil {
 		tx.Rollback()
@@ -284,7 +283,7 @@ func GetMailAward(c *gin.Context) {
 				"message": "Mail not found",
 			})
 		} else {
-			log.Errorf("Failed to query mail award for user %d, mail %s: %v", req.UserID, mailID, err)
+			log.Errorf("Failed to query mail award for user %d, mail %s: %v", userid, mailID, err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
 				"message": "Failed to get award",
@@ -295,11 +294,11 @@ func GetMailAward(c *gin.Context) {
 	}
 
 	// 检查邮件状态
-	if mailStatus != 1 {
+	if mailStatus == 2 {
 		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
-			"message": "Mail must be read before getting award",
+			"message": "Mail already got",
 		})
 		return
 	}
@@ -311,12 +310,12 @@ func GetMailAward(c *gin.Context) {
 	// 更新邮件状态为已领取
 	updateQuery := `UPDATE mailUsers 
 			SET status = 2, update_at = CURRENT_TIMESTAMP 
-			WHERE userid = ? AND id = ?`
-	_, err = tx.Exec(updateQuery, req.UserID, mailID)
+			WHERE userid = ? AND mailid = ?`
+	_, err = tx.Exec(updateQuery, userid, mailID)
 
 	if err != nil {
 		tx.Rollback()
-		log.Errorf("Failed to update mail status for user %d, mail %s: %v", req.UserID, mailID, err)
+		log.Errorf("Failed to update mail status for user %d, mail %s: %v", userid, mailID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Failed to get award",

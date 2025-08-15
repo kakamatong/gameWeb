@@ -38,11 +38,16 @@ var AppConfig struct {
 		Format     string
 		DateFormat string // 添加日期格式配置
 	}
-    // 添加JWT配置
-    JWT struct {
-        SecretKey string
-        ExpireTime int64 // 过期时间，单位：秒
-    }
+	// 添加JWT配置
+	JWT struct {
+		SecretKey  string
+		ExpireTime int64 // 过期时间，单位：秒
+	}
+	// 添加GameServer配置
+	GameServer struct {
+		Host string
+		Port string
+	}
 }
 
 // InitConfig 初始化配置
@@ -76,9 +81,12 @@ func InitConfig() {
 	viper.SetDefault("Log.Path", "logs/game.log")
 	viper.SetDefault("Log.Format", "console")
 	viper.SetDefault("Log.DateFormat", "2006-01-02") // 添加默认日期格式
-    // 添加JWT默认值
-    viper.SetDefault("JWT.SecretKey", "GameWebJWTSecretKey1234567890ABCDEF")
-    viper.SetDefault("JWT.ExpireTime", 3600) // 默认1小时过期
+	// 添加JWT默认值
+	viper.SetDefault("JWT.SecretKey", "GameWebJWTSecretKey1234567890ABCDEF")
+	viper.SetDefault("JWT.ExpireTime", 3600) // 默认1小时过期
+	// 添加GameServer默认值
+	viper.SetDefault("GameServer.Host", "localhost")
+	viper.SetDefault("GameServer.Port", "9000")
 
 	if err := viper.ReadInConfig(); err != nil {
 		panic("Failed to read config file: " + err.Error())

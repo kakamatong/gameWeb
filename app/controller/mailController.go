@@ -478,6 +478,8 @@ func GetMailAward(c *gin.Context) {
 		return
 	}
 
+	// 通知游戏服务插入通知
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
 		"message": "Award got successfully",

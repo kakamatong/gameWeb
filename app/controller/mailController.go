@@ -527,21 +527,50 @@ func GetMailAward(c *gin.Context) {
 			} else {
 				log.Infof("Award notice sent successfully, noticeid: %d", respData.NoticeID)
 				// 6. 将noticeid返回给客户端
+				res := struct {
+					NoticeID int64 `json:"noticeid"`
+					Awards   struct {
+						RichTypes []int `json:"richTypes"`
+						RichNums  []int `json:"richNums"`
+					} `json:"awards"`
+				}{
+					NoticeID: respData.NoticeID,
+					Awards: struct {
+						RichTypes []int `json:"richTypes"`
+						RichNums  []int `json:"richNums"`
+					}{
+						RichTypes: message.RichTypes,
+						RichNums:  message.RichNums,
+					},
+				}
 				c.JSON(http.StatusOK, gin.H{
-					"code":     200,
-					"message":  "Award got successfully",
-					"awards":   awards,
-					"noticeid": respData.NoticeID,
+					"code":    200,
+					"message": "Award got successfully",
+					"data":    res,
 				})
 				return
 			}
 		}
 	}
 
+	res := struct {
+		Awards struct {
+			RichTypes []int `json:"richTypes"`
+			RichNums  []int `json:"richNums"`
+		} `json:"awards"`
+	}{
+		Awards: struct {
+			RichTypes []int `json:"richTypes"`
+			RichNums  []int `json:"richNums"`
+		}{
+			RichTypes: message.RichTypes,
+			RichNums:  message.RichNums,
+		},
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
 		"message": "Award got successfully",
-		"awards":  awards,
+		"data":    res,
 	})
 }
 

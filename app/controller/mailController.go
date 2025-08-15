@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/log"
 	"net/http"
@@ -479,6 +481,62 @@ func GetMailAward(c *gin.Context) {
 	}
 
 	// 通知游戏服务插入通知
+	// 1. 准备奖励数据
+	var message struct {
+		RichTypes []int `json:"richTypes"`
+		RichNums  []int `json:"richNums"`
+	}
+
+	for _, prop := range awardData.Props {
+		message.RichTypes = append(message.RichTypes, prop.Id)
+		message.RichNums = append(message.RichNums, prop.Cnt)
+	}
+
+	// 2. 准备请求数据
+	reqData := struct {
+		UserID  int64       `json:"userid"`
+		Message interface{} `json:"message"`
+	}{
+		UserID:  userIDInt,
+		Message: message,
+	}
+
+	// 3. 转换为JSON
+	jsonData, err := json.Marshal(reqData)
+	if err != nil {
+		log.Errorf("Failed to marshal request data: %v", err)
+		// 这里不返回错误，因为奖励已经发放成功
+	} else {
+		// 4. 发送HTTP POST请求
+		gameServerConfig := config.AppConfig.GameServer
+		url := fmt.Sprintf("http://%s:%s/awardnotice", gameServerConfig.Host, gameServerConfig.Port)
+
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Errorf("Failed to send award notice to game server: %v", err)
+		} else {
+			defer resp.Body.Close()
+
+			// 5. 解析响应
+			var respData struct {
+				NoticeID int64 `json:"noticeid"`
+			}
+
+			if err := json.NewDecoder(resp.Body).Decode(&respData); err != nil {
+				log.Errorf("Failed to decode game server response: %v", err)
+			} else {
+				log.Infof("Award notice sent successfully, noticeid: %d", respData.NoticeID)
+				// 6. 将noticeid返回给客户端
+				c.JSON(http.StatusOK, gin.H{
+					"code":     200,
+					"message":  "Award got successfully",
+					"awards":   awards,
+					"noticeid": respData.NoticeID,
+				})
+				return
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,

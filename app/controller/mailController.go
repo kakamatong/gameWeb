@@ -495,7 +495,7 @@ func GetMailAward(c *gin.Context) {
 	// 2. 准备请求数据
 	reqData := struct {
 		UserID  int64       `json:"userid"`
-		Message interface{} `json:"message"`
+		Message interface{} `json:"awardMessage"`
 	}{
 		UserID:  userIDInt,
 		Message: message,

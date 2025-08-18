@@ -17,6 +17,7 @@ type ServiceNode struct {
 	Name       string `json:"name"`
 	Cnt        int    `json:"cnt"`
 	ClientAddr string `json:"clientAddr,omitempty"`
+	Hide       bool   `json:"hide,omitempty"`
 }
 
 // 定义ClusterConfig结构体
@@ -78,17 +79,26 @@ func GetAuthGameList(c *gin.Context) {
 	// 在处理gate和game数据时添加urlencode处理
 	// 处理gate数据
 	for _, gate := range clusterConfig.List.Gate {
+		if gate.Hide {
+			continue
+		}
 		encodedAddr := url.QueryEscape(gate.ClientAddr)
 		result["gate"][gate.Name] = encodedAddr
 	}
 
 	// 处理game数据
 	for _, game := range clusterConfig.List.Game {
+		if game.Hide {
+			continue
+		}
 		encodedAddr := url.QueryEscape(game.ClientAddr)
 		result["game"][game.Name] = encodedAddr
 	}
 
 	for _, login := range clusterConfig.List.Login {
+		if login.Hide {
+			continue
+		}
 		encodedAddr := url.QueryEscape(login.ClientAddr)
 		result["login"][login.Name] = encodedAddr
 	}

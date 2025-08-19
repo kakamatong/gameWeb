@@ -88,9 +88,6 @@ func GetAuthGameList(c *gin.Context) {
 
 	// 处理game数据
 	for _, game := range clusterConfig.List.Game {
-		if game.Hide {
-			continue
-		}
 		encodedAddr := url.QueryEscape(game.ClientAddr)
 		result["game"][game.Name] = encodedAddr
 	}

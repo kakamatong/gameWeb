@@ -1,10 +1,12 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/log"
 	"gameWeb/models"
@@ -1276,11 +1278,97 @@ func GetMailAward(c *gin.Context) {
 
 	log.Infof("邮件奖励领取成功: mailID=%d, userID=%d, awards=%v", mailID, req.UserID, awards)
 
+	// 向游戏服务器发送奖励通知
+	noticeID, err := sendAwardNoticeToGameServer(req.UserID, awards)
+	if err != nil {
+		log.Errorf("发送奖励通知到游戏服务器失败: %v", err)
+		// 奖励已经发放成功，通知失败只记录日志，不影响返回结果
+	}
+
+	responseData := gin.H{
+		"awards": awards,
+	}
+	
+	// 如果通知成功，添加noticeID到响应
+	if noticeID > 0 {
+		responseData["noticeid"] = noticeID
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code":    200,
 		"message": "success",
-		"data": gin.H{
-			"awards": awards,
-		},
+		"data":    responseData,
 	})
+}
+
+// sendAwardNoticeToGameServer 向游戏服务器发送奖励通知
+func sendAwardNoticeToGameServer(userID int64, awards []struct {
+	Type  int   `json:"type"`
+	Count int64 `json:"count"`
+}) (int64, error) {
+	// 构建awardMessage JSON字符串
+	richTypes := make([]int, len(awards))
+	richNums := make([]int64, len(awards))
+	
+	for i, award := range awards {
+		richTypes[i] = award.Type
+		richNums[i] = award.Count
+	}
+	
+	awardMessage := map[string]interface{}{
+		"richTypes": richTypes,
+		"richNums":  richNums,
+	}
+	
+	awardMessageBytes, err := json.Marshal(awardMessage)
+	if err != nil {
+		return 0, fmt.Errorf("序列化awardMessage失败: %v", err)
+	}
+	
+	// 构建请求数据
+	requestData := map[string]interface{}{
+		"userid":       userID,
+		"awardMessage": string(awardMessageBytes),
+	}
+	
+	requestBytes, err := json.Marshal(requestData)
+	if err != nil {
+		return 0, fmt.Errorf("序列化请求数据失败: %v", err)
+	}
+	
+	// 构建请求URL
+	gameServerURL := fmt.Sprintf("http://%s:%s/awardNotice", 
+		config.AppConfig.GameServer.Host,
+		config.AppConfig.GameServer.Port)
+	
+	// 创建HTTP客户端
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	
+	// 发送POST请求
+	resp, err := client.Post(gameServerURL, "application/json", bytes.NewBuffer(requestBytes))
+	if err != nil {
+		return 0, fmt.Errorf("发送HTTP请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+	
+	// 检查HTTP状态码
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("游戏服务器返回错误状态码: %d", resp.StatusCode)
+	}
+	
+	// 解析响应
+	var response struct {
+		NoticeID int64 `json:"noticeid"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return 0, fmt.Errorf("解析响应失败: %v", err)
+	}
+	
+	log.Infof("成功发送奖励通知到游戏服务器: userID=%d, noticeID=%d, url=%s", 
+		userID, response.NoticeID, gameServerURL)
+	
+	return response.NoticeID, nil
 }

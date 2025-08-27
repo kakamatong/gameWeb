@@ -1,0 +1,20 @@
+CREATE TABLE `logResult10001` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `type` tinyint DEFAULT '0' COMMENT '计分类型',
+  `userid` bigint DEFAULT '0' COMMENT '用户id',
+  `gameid` bigint DEFAULT '0' COMMENT '游戏id',
+  `roomid` bigint DEFAULT '0' COMMENT '房间号',
+  `result` tinyint DEFAULT '0' COMMENT '0:无,1:赢,2:输,3:平,4:逃跑',
+  `score1` bigint DEFAULT '0' COMMENT '财富1',
+  `score2` bigint DEFAULT '0' COMMENT '财富2',
+  `score3` bigint DEFAULT '0' COMMENT '财富3',
+  `score4` bigint DEFAULT '0' COMMENT '财富4',
+  `score5` bigint DEFAULT '0' COMMENT '财富5',
+  `time` timestamp NOT NULL COMMENT '发生时间',
+  `ext` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '扩展数据',
+  PRIMARY KEY (`id`),
+  KEY `idx_time` (`time`),
+  KEY `idx_gameid_roomid` (`gameid`,`roomid`),
+  KEY `idx_userid` (`userid`),
+  KEY `idx_time_type` (`time`,`type`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci  

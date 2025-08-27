@@ -1,0 +1,31 @@
+/bin
+/logs
+config.yaml
+pid.txt
+/.qoder
+
+# 安全相关文件
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+secrets.yaml
+secrets.json
+
+# 数据库备份文件
+*.sql.gz
+*.dump
+*.backup
+
+# 临时文件
+*.tmp
+*.temp
+*~
+
+# IDE相关
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,56 @@
+# 配置文件模板
+# 请复制此文件为 config.yaml 并填入实际配置信息
+# config.yaml 已被加入 .gitignore，不会被提交到版本控制
+
+server:
+  port: "8080"
+
+mysql:
+  host: "localhost"
+  port: "3306"
+  username: "root"
+  password: "your-password-here"
+  database: "game_db"
+  charset: "utf8mb4"
+
+mysql_gameweb:
+  host: "localhost"
+  port: "3306"
+  username: "root"
+  password: "your-password-here"
+  database: "gameWeb"
+  charset: "utf8mb4"
+
+mysql_gamelog:
+  host: "your-gamelog-host-here"     # 不要使用真实IP
+  port: "3306"
+  username: "your-username-here"     # 不要使用真实用户名
+  password: "your-password-here"     # 不要使用真实密码
+  database: "gamelog"
+  charset: "utf8mb4"
+
+redis:
+  host: "localhost"
+  port: "6379"
+  password: ""
+  database: 0
+
+log:
+  level: "info"
+  path: "logs/game.log"
+  format: "console"
+
+jwt:
+  secret_key: "your-jwt-secret-key"
+  expire_time: 3600
+
+admin:
+  jwt_secret_key: "your-admin-jwt-secret"
+  token_expire_hours: 8
+  session_timeout: 24
+  max_login_attempts: 5
+  lockout_duration: 30
+
+gameserver:
+  host: "localhost"
+  port: "9000"

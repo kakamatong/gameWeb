@@ -1201,100 +1201,35 @@ func GetMailAward(c *gin.Context) {
 	}
 	defer txGame.Rollback()
 
-	// 发放奖励到用户财富表 - 优化为批量操作
-	// 1. 先批量查询所有需要的财富类型
-	richTypes := make([]interface{}, len(awards))
-	placeholders := make([]string, len(awards))
-	for i, award := range awards {
-		richTypes[i] = award.Type
-		placeholders[i] = "?"
-	}
-	
-	// 批量查询现有财富
-	existingWealth := make(map[int]int64)
+	// 发放奖励到用户财富表 - 使用INSERT...ON DUPLICATE KEY UPDATE优化
+	// 构建批量插入/更新语句
 	if len(awards) > 0 {
-		batchQuery := fmt.Sprintf("SELECT richType, richNums FROM userRiches WHERE userid = ? AND richType IN (%s)", 
-			strings.Join(placeholders, ","))
-		queryArgs := append([]interface{}{req.UserID}, richTypes...)
+		var values []string
+		var args []interface{}
 		
-		rows, err := txGame.Query(batchQuery, queryArgs...)
-		if err != nil {
-			log.Errorf("批量查询用户财富失败: %v", err)
+		for _, award := range awards {
+			values = append(values, "(?, ?, ?)")
+			args = append(args, req.UserID, award.Type, award.Count)
+		}
+		
+		// 使用INSERT...ON DUPLICATE KEY UPDATE一次性处理所有奖励
+		// 如果记录不存在则插入，存在则累加
+		batchUpsertQuery := fmt.Sprintf(`
+			INSERT INTO userRiches (userid, richType, richNums) 
+			VALUES %s
+			ON DUPLICATE KEY UPDATE richNums = richNums + VALUES(richNums)
+		`, strings.Join(values, ","))
+		
+		if _, err := txGame.Exec(batchUpsertQuery, args...); err != nil {
+			log.Errorf("批量插入/更新用户财富失败: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    500,
-				"message": "Failed to query user wealth",
+				"message": "Failed to grant awards",
 			})
 			return
 		}
-		defer rows.Close()
 		
-		for rows.Next() {
-			var richType int
-			var richNums int64
-			if err := rows.Scan(&richType, &richNums); err == nil {
-				existingWealth[richType] = richNums
-			}
-		}
-	}
-	
-	// 2. 构建批量插入和更新语句
-	var insertValues []string
-	var insertArgs []interface{}
-	var updateCases []string
-	var updateArgs []interface{}
-	var updateTypes []interface{}
-	
-	for _, award := range awards {
-		if _, exists := existingWealth[award.Type]; exists {
-			// 需要更新
-			updateCases = append(updateCases, "WHEN ? THEN richNums + ?")
-			updateArgs = append(updateArgs, award.Type, award.Count)
-			updateTypes = append(updateTypes, award.Type)
-		} else {
-			// 需要插入
-			insertValues = append(insertValues, "(?, ?, ?)")
-			insertArgs = append(insertArgs, req.UserID, award.Type, award.Count)
-		}
-	}
-	
-	// 3. 执行批量插入（如果有新的财富类型）
-	if len(insertValues) > 0 {
-		insertQuery := fmt.Sprintf("INSERT INTO userRiches (userid, richType, richNums) VALUES %s", 
-			strings.Join(insertValues, ","))
-		if _, err := txGame.Exec(insertQuery, insertArgs...); err != nil {
-			log.Errorf("批量插入用户财富失败: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
-				"message": "Failed to insert user wealth",
-			})
-			return
-		}
-	}
-	
-	// 4. 执行批量更新（如果有现有的财富类型）
-	if len(updateCases) > 0 {
-		updatePlaceholders := make([]string, len(updateTypes))
-		for i := range updateTypes {
-			updatePlaceholders[i] = "?"
-		}
-		
-		updateQuery := fmt.Sprintf(`
-			UPDATE userRiches 
-			SET richNums = CASE richType %s END
-			WHERE userid = ? AND richType IN (%s)
-		`, strings.Join(updateCases, " "), strings.Join(updatePlaceholders, ","))
-		
-		finalArgs := append(updateArgs, req.UserID)
-		finalArgs = append(finalArgs, updateTypes...)
-		
-		if _, err := txGame.Exec(updateQuery, finalArgs...); err != nil {
-			log.Errorf("批量更新用户财富失败: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    500,
-				"message": "Failed to update user wealth",
-			})
-			return
-		}
+		log.Infof("成功批量处理用户财富: userID=%d, 奖励数量=%d", req.UserID, len(awards))
 	}
 
 	// 提交用户财富事务

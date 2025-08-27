@@ -1248,19 +1248,25 @@ func GetMailAward(c *gin.Context) {
 
 	// 更新邮件状态为已领取
 	updateMailQuery := `
-		INSERT INTO mailUsers (mailid, userid, status, startTime, endTime, update_at)
-		SELECT ?, ?, 2, ms.startTime, ms.endTime, CURRENT_TIMESTAMP
-		FROM mailSystem ms WHERE ms.mailid = ?
-		ON DUPLICATE KEY UPDATE 
-			status = 2, update_at = CURRENT_TIMESTAMP
+		UPDATE mailUsers 
+		SET status = 2, update_at = CURRENT_TIMESTAMP
+		WHERE mailid = ? AND userid = ?
 	`
 
-	_, err = txMail.Exec(updateMailQuery, mailID, req.UserID, mailID)
+	result, err := txMail.Exec(updateMailQuery, mailID, req.UserID)
 	if err != nil {
 		log.Errorf("更新邮件状态失败: %v", err)
 		// 用户财富已发放，此处记录日志但不返回错误
 		log.Warnf("用户财富已发放但邮件状态更新失败，需要手动处理: mailID=%d, userID=%d", mailID, req.UserID)
 	} else {
+		// 检查是否有行被更新
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Errorf("获取更新行数失败: %v", err)
+		} else if rowsAffected == 0 {
+			log.Warnf("没有邮件记录被更新，可能邮件不存在或用户无权限: mailID=%d, userID=%d", mailID, req.UserID)
+		}
+		
 		// 提交邮件事务
 		if err := txMail.Commit(); err != nil {
 			log.Errorf("提交邮件事务失败: %v", err)

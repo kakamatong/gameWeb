@@ -1337,7 +1337,7 @@ func sendAwardNoticeToGameServer(userID int64, awards []struct {
 	}
 	
 	// 构建请求URL
-	gameServerURL := fmt.Sprintf("http://%s:%s/awardNotice", 
+	gameServerURL := fmt.Sprintf("http://%s:%s/awardnotice", 
 		config.AppConfig.GameServer.Host,
 		config.AppConfig.GameServer.Port)
 	

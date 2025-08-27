@@ -1155,18 +1155,36 @@ func GetMailAward(c *gin.Context) {
 	}
 
 	// 解析奖励内容
-	var awards []struct {
-		Type  int   `json:"type"`
-		Count int64 `json:"count"`
+	var awardsData struct {
+		Props []struct {
+			ID  int   `json:"id"`
+			Cnt int64 `json:"cnt"`
+		} `json:"props"`
 	}
 
-	if err := json.Unmarshal([]byte(mailInfo.Awards), &awards); err != nil {
+	if err := json.Unmarshal([]byte(mailInfo.Awards), &awardsData); err != nil {
 		log.Errorf("解析奖励JSON失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
 			"message": "Invalid award format",
 		})
 		return
+	}
+
+	// 转换为内部使用的awards格式
+	awards := make([]struct {
+		Type  int   `json:"type"`
+		Count int64 `json:"count"`
+	}, len(awardsData.Props))
+	
+	for i, prop := range awardsData.Props {
+		awards[i] = struct {
+			Type  int   `json:"type"`
+			Count int64 `json:"count"`
+		}{
+			Type:  prop.ID,
+			Count: prop.Cnt,
+		}
 	}
 
 	// 开始用户财富数据库事务（game数据库）

@@ -122,36 +122,35 @@ type LogResult10001 struct {
 	Ext        string    `json:"ext" db:"ext"`
 }
 
-// Mails 邮件模型
+// Mails 邮件模型 - 存放邮件基本信息
 type Mails struct {
 	ID        int64     `json:"id" db:"id"`
-	Type      int8      `json:"type" db:"type"`
+	Type      int8      `json:"type" db:"type"` // 0-全服邮件, 1-个人邮件
+	SenderID  int64     `json:"senderId" db:"senderid"` // 发送者ID，0表示系统
 	Title     string    `json:"title" db:"title"`
 	Content   string    `json:"content" db:"content"`
-	Awards    string    `json:"awards" db:"awards"`
-	StartTime time.Time `json:"startTime" db:"startTime"`
-	EndTime   time.Time `json:"endTime" db:"endTime"`
-	Status    int8      `json:"status" db:"status"`
+	Awards    string    `json:"awards" db:"awards"` // JSON格式: {"props":[{"id":2,"cnt":20000},{"id":1,"cnt":100}]}
+	CreatedAt time.Time `json:"createdAt" db:"created_at"`
 }
 
-// MailSystem 邮件系统模型
+// MailSystem 系统邮件模型 - 包含邮件生效时间和类型
 type MailSystem struct {
-	ID      int64 `json:"id" db:"id"`
-	MailID  int64 `json:"mailId" db:"mailid"`
-	UserID  int64 `json:"userid" db:"userid"`
-	IsGlobal int8 `json:"isGlobal" db:"isGlobal"`
+	ID        int64     `json:"id" db:"id"`
+	Type      int8      `json:"type" db:"type"` // 0-全服邮件, 1-个人邮件, 2-按渠道邮件, 3-按登入类型邮件
+	MailID    int64     `json:"mailId" db:"mailid"` // 关联mails表id
+	StartTime time.Time `json:"startTime" db:"startTime"` // 邮件生效开始时间
+	EndTime   time.Time `json:"endTime" db:"endTime"` // 邮件生效结束时间
 }
 
-// MailUsers 用户邮件模型
+// MailUsers 用户邮件模型 - 表示用户目前收到的邮件
 type MailUsers struct {
-	ID         int64     `json:"id" db:"id"`
-	MailID     int64     `json:"mailId" db:"mailid"`
-	UserID     int64     `json:"userid" db:"userid"`
-	IsRead     int8      `json:"isRead" db:"isRead"`
-	IsReceived int8      `json:"isReceived" db:"isReceived"`
-	ReadTime   time.Time `json:"readTime" db:"readTime"`
-	ReceiveTime time.Time `json:"receiveTime" db:"receiveTime"`
-	CreateTime time.Time `json:"createTime" db:"create_time"`
+	ID        int64     `json:"id" db:"id"`
+	UserID    int64     `json:"userId" db:"userid"`
+	MailID    int64     `json:"mailId" db:"mailid"` // 关联mails表id
+	Status    int8      `json:"status" db:"status"` // 0-未读, 1-已读, 2-已领取, 3-已删除
+	StartTime time.Time `json:"startTime" db:"startTime"` // 邮件生效开始时间
+	EndTime   time.Time `json:"endTime" db:"endTime"` // 邮件生效结束时间
+	UpdateAt  time.Time `json:"updateAt" db:"update_at"` // 最后更新时间
 }
 
 // API请求和响应模型
@@ -220,13 +219,43 @@ type LogQueryRequest struct {
 
 // SendMailRequest 发送邮件请求
 type SendMailRequest struct {
-	Type        int8      `json:"type" binding:"required"`
+	Type        int8      `json:"type" binding:"required"` // 0-全服邮件, 1-个人邮件
 	Title       string    `json:"title" binding:"required,min=1,max=100"`
 	Content     string    `json:"content" binding:"required,min=1,max=1000"`
-	Awards      string    `json:"awards"`
+	Awards      string    `json:"awards"` // JSON格式: {"props":[{"id":2,"cnt":20000},{"id":1,"cnt":100}]}
 	StartTime   time.Time `json:"startTime" binding:"required"`
 	EndTime     time.Time `json:"endTime" binding:"required"`
-	TargetUsers []int64   `json:"targetUsers"`
+	TargetUsers []int64   `json:"targetUsers"` // 个人邮件的目标用户
+}
+
+// MailDetailResponse 邮件详情响应
+type MailDetailResponse struct {
+	ID        int64     `json:"id"`
+	Type      int8      `json:"type"`
+	Title     string    `json:"title"`
+	Content   string    `json:"content"`
+	Awards    string    `json:"awards"`
+	Status    int8      `json:"status"` // 用户邮件状态
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// MailListResponse 邮件列表响应
+type MailListResponse struct {
+	Total int64               `json:"total"`
+	Mails []MailDetailResponse `json:"mails"`
+}
+
+// AwardsStruct 奖励结构体
+type AwardsStruct struct {
+	Props []PropItem `json:"props"`
+}
+
+// PropItem 道具项
+type PropItem struct {
+	ID  int64 `json:"id"`  // 道具ID
+	Cnt int64 `json:"cnt"` // 数量
 }
 
 // APIResponse 统一API响应格式

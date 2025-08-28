@@ -10,6 +10,7 @@ import (
 	"gameWeb/middleware"
 	"gameWeb/models"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -103,9 +104,19 @@ func AdminLogin(c *gin.Context) {
 		ID:            admin.ID,
 		Username:      admin.Username,
 		Email:         admin.Email,
+		Mobile:        admin.Mobile,
 		RealName:      admin.RealName,
+		Avatar:        admin.Avatar,
+		DepartmentID:  admin.DepartmentID,
+		Note:          admin.Note,
+		Status:        admin.Status,
 		IsSuperAdmin:  admin.IsSuperAdmin == 1,
+		LastLoginIP:   admin.LastLoginIP,
 		LastLoginTime: admin.LastLoginTime,
+		CreatedBy:     admin.CreatedBy,
+		UpdatedBy:     admin.UpdatedBy,
+		CreatedTime:   admin.CreatedTime,
+		UpdatedTime:   admin.UpdatedTime,
 	}
 
 	response := models.AdminLoginResponse{
@@ -175,9 +186,19 @@ func GetAdminInfo(c *gin.Context) {
 		ID:            admin.ID,
 		Username:      admin.Username,
 		Email:         admin.Email,
+		Mobile:        admin.Mobile,
 		RealName:      admin.RealName,
+		Avatar:        admin.Avatar,
+		DepartmentID:  admin.DepartmentID,
+		Note:          admin.Note,
+		Status:        admin.Status,
 		IsSuperAdmin:  admin.IsSuperAdmin == 1,
+		LastLoginIP:   admin.LastLoginIP,
 		LastLoginTime: admin.LastLoginTime,
+		CreatedBy:     admin.CreatedBy,
+		UpdatedBy:     admin.UpdatedBy,
+		CreatedTime:   admin.CreatedTime,
+		UpdatedTime:   admin.UpdatedTime,
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{
@@ -455,6 +476,64 @@ func checkAdminEmailExists(email string) (bool, error) {
 	return count > 0, err
 }
 
+// checkAdminEmailExistsExcludeID 检查邮箱是否存在（排除指定ID）
+func checkAdminEmailExistsExcludeID(email string, excludeID uint64) (bool, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM adminAccount WHERE email = ? AND id != ?"
+	err := db.MySQLDBGameWeb.QueryRow(query, email, excludeID).Scan(&count)
+	return count > 0, err
+}
+
+// updateAdminInfo 更新管理员信息
+func updateAdminInfo(adminID uint64, email, mobile, realName, avatar *string, departmentID *int, note *string, updatedBy uint64) error {
+	// 构建动态SQL语句
+	var setParts []string
+	var args []interface{}
+
+	if email != nil {
+		setParts = append(setParts, "email = ?")
+		args = append(args, *email)
+	}
+	if mobile != nil {
+		setParts = append(setParts, "mobile = ?")
+		args = append(args, *mobile)
+	}
+	if realName != nil {
+		setParts = append(setParts, "realName = ?")
+		args = append(args, *realName)
+	}
+	if avatar != nil {
+		setParts = append(setParts, "avatar = ?")
+		args = append(args, *avatar)
+	}
+	if departmentID != nil {
+		setParts = append(setParts, "departmentId = ?")
+		args = append(args, *departmentID)
+	}
+	if note != nil {
+		setParts = append(setParts, "note = ?")
+		args = append(args, *note)
+	}
+
+	// 如果没有任何字段需要更新，直接返回
+	if len(setParts) == 0 {
+		return nil
+	}
+
+	// 添加固定的更新字段
+	setParts = append(setParts, "updatedBy = ?", "updatedTime = CURRENT_TIMESTAMP")
+	args = append(args, updatedBy)
+
+	// 添加WHERE条件
+	args = append(args, adminID)
+
+	// 构建完整的SQL语句
+	query := fmt.Sprintf("UPDATE adminAccount SET %s WHERE id = ?", strings.Join(setParts, ", "))
+
+	_, err := db.MySQLDBGameWeb.Exec(query, args...)
+	return err
+}
+
 // createAdmin 创建管理员
 func createAdmin(admin *models.AdminAccount) error {
 	query := `
@@ -484,6 +563,131 @@ func createAdmin(admin *models.AdminAccount) error {
 	
 	admin.ID = uint64(id)
 	return nil
+}
+
+// UpdateAdmin 更新管理员信息
+func UpdateAdmin(c *gin.Context) {
+	// 获取路径参数中的管理员ID
+	adminID := c.Param("id")
+	if adminID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "管理员ID不能为空",
+		})
+		return
+	}
+
+	// 解析管理员ID
+	var targetAdminID uint64
+	if _, err := fmt.Sscanf(adminID, "%d", &targetAdminID); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "无效的管理员ID格式",
+		})
+		return
+	}
+
+	// 获取当前操作的管理员ID
+	currentAdminID, exists := c.Get("adminId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.APIResponse{
+			Code:    401,
+			Message: "未登录",
+		})
+		return
+	}
+
+	// 获取当前管理员信息以检查权限
+	currentAdmin, err := getAdminByID(currentAdminID.(uint64))
+	if err != nil {
+		log.Errorf("查询当前管理员信息失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+
+	// 权限检查：只能修改自己的信息，或者超级管理员可以修改任何人的信息
+	if currentAdminID.(uint64) != targetAdminID && currentAdmin.IsSuperAdmin != 1 {
+		c.JSON(http.StatusForbidden, models.APIResponse{
+			Code:    403,
+			Message: "没有权限修改该管理员信息",
+		})
+		return
+	}
+
+	// 绑定请求参数
+	var req struct {
+		Email        *string `json:"email" binding:"omitempty,email,max=100"`
+		Mobile       *string `json:"mobile" binding:"omitempty,max=20"`
+		RealName     *string `json:"realName" binding:"omitempty,min=1,max=50"`
+		Avatar       *string `json:"avatar" binding:"omitempty,max=255"`
+		DepartmentID *int    `json:"departmentId"`
+		Note         *string `json:"note" binding:"omitempty,max=500"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Errorf("更新管理员参数绑定失败: %v", err)
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	// 检查要更新的管理员是否存在
+	targetAdmin, err := getAdminByID(targetAdminID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Code:    404,
+				Message: "管理员不存在",
+			})
+			return
+		}
+		log.Errorf("查询目标管理员信息失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+
+	// 检查邮箱唯一性（如果要更新邮箱）
+	if req.Email != nil && *req.Email != targetAdmin.Email {
+		if exists, err := checkAdminEmailExistsExcludeID(*req.Email, targetAdminID); err != nil {
+			log.Errorf("检查邮箱唯一性失败: %v", err)
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Code:    500,
+				Message: "系统错误",
+			})
+			return
+		} else if exists {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "邮箱已被其他管理员使用",
+			})
+			return
+		}
+	}
+
+	// 执行更新操作
+	if err := updateAdminInfo(targetAdminID, req.Email, req.Mobile, req.RealName, req.Avatar, req.DepartmentID, req.Note, currentAdminID.(uint64)); err != nil {
+		log.Errorf("更新管理员信息失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "更新失败",
+		})
+		return
+	}
+
+	log.Infof("管理员信息更新成功: ID: %d, 操作者: %d", targetAdminID, currentAdminID.(uint64))
+	
+	c.JSON(http.StatusOK, models.APIResponse{
+		Code:    200,
+		Message: "更新成功",
+	})
 }
 
 // generateSecureToken 生成安全令牌

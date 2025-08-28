@@ -41,6 +41,7 @@ func RegisterRoutes(router *gin.Engine) {
 				// 管理员认证管理
 				authorized.POST("/logout", controller.AdminLogout)
 				authorized.GET("/info", controller.GetAdminInfo)
+				authorized.PUT("/update/:id", controller.UpdateAdmin)
 				
 				// 管理员管理（仅超级管理员）
 				superAdmin := authorized.Group("/")

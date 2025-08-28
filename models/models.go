@@ -170,12 +170,22 @@ type AdminLoginResponse struct {
 
 // AdminInfo 管理员信息响应
 type AdminInfo struct {
-	ID           uint64    `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	RealName     string    `json:"realName"`
-	IsSuperAdmin bool      `json:"isSuperAdmin"`
+	ID            uint64    `json:"id"`
+	Username      string    `json:"username"`
+	Email         string    `json:"email"`
+	Mobile        string    `json:"mobile"`
+	RealName      string    `json:"realName"`
+	Avatar        string    `json:"avatar"`
+	DepartmentID  *int      `json:"departmentId,omitempty"`
+	Note          string    `json:"note"`
+	Status        int8      `json:"status"`
+	IsSuperAdmin  bool      `json:"isSuperAdmin"`
+	LastLoginIP   string    `json:"lastLoginIp"`
 	LastLoginTime time.Time `json:"lastLoginTime"`
+	CreatedBy     *uint64   `json:"createdBy,omitempty"`
+	UpdatedBy     *uint64   `json:"updatedBy,omitempty"`
+	CreatedTime   time.Time `json:"createdTime"`
+	UpdatedTime   time.Time `json:"updatedTime"`
 }
 
 // UserListRequest 用户列表查询请求

@@ -97,29 +97,29 @@ type UserRich struct {
 type LogAuth struct {
 	ID         int64     `json:"id" db:"id"`
 	UserID     int64     `json:"userid" db:"userid"`
-	Channel    string    `json:"channel" db:"channel"`
+	Nickname   string    `json:"nickname" db:"nickname"`
 	IP         string    `json:"ip" db:"ip"`
-	DeviceID   string    `json:"deviceId" db:"deviceId"`
-	LoginTime  time.Time `json:"loginTime" db:"loginTime"`
-	LogoutTime time.Time `json:"logoutTime" db:"logoutTime"`
-	Duration   int32     `json:"duration" db:"duration"`
+	LoginType  string    `json:"loginType" db:"loginType"`
 	Status     int8      `json:"status" db:"status"`
+	Ext        string    `json:"ext" db:"ext"`
+	CreateTime time.Time `json:"createTime" db:"create_time"`
 }
 
 // LogResult10001 对局结果日志模型
 type LogResult10001 struct {
 	ID         int64     `json:"id" db:"id"`
+	Type       int8      `json:"type" db:"type"`
 	UserID     int64     `json:"userid" db:"userid"`
 	GameID     int64     `json:"gameid" db:"gameid"`
 	RoomID     int64     `json:"roomid" db:"roomid"`
-	GameMode   int8      `json:"gameMode" db:"gameMode"`
 	Result     int8      `json:"result" db:"result"`
-	Score      int32     `json:"score" db:"score"`
-	WinRiches  int64     `json:"winRiches" db:"winRiches"`
-	LoseRiches int64     `json:"loseRiches" db:"loseRiches"`
-	StartTime  time.Time `json:"startTime" db:"startTime"`
-	EndTime    time.Time `json:"endTime" db:"endTime"`
-	CreateTime time.Time `json:"createTime" db:"create_time"`
+	Score1     int64     `json:"score1" db:"score1"`
+	Score2     int64     `json:"score2" db:"score2"`
+	Score3     int64     `json:"score3" db:"score3"`
+	Score4     int64     `json:"score4" db:"score4"`
+	Score5     int64     `json:"score5" db:"score5"`
+	Time       time.Time `json:"time" db:"time"`
+	Ext        string    `json:"ext" db:"ext"`
 }
 
 // Mails 邮件模型

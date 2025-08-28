@@ -46,12 +46,12 @@ func GetUserAuthLogs(c *gin.Context) {
 	}
 
 	if !req.StartTime.IsZero() {
-		whereConditions = append(whereConditions, "loginTime >= ?")
+		whereConditions = append(whereConditions, "create_time >= ?")
 		args = append(args, req.StartTime)
 	}
 
 	if !req.EndTime.IsZero() {
-		whereConditions = append(whereConditions, "loginTime <= ?")
+		whereConditions = append(whereConditions, "create_time <= ?")
 		args = append(args, req.EndTime)
 	}
 
@@ -129,12 +129,12 @@ func GetUserGameLogs(c *gin.Context) {
 	}
 
 	if !req.StartTime.IsZero() {
-		whereConditions = append(whereConditions, "startTime >= ?")
+		whereConditions = append(whereConditions, "time >= ?")
 		args = append(args, req.StartTime)
 	}
 
 	if !req.EndTime.IsZero() {
-		whereConditions = append(whereConditions, "endTime <= ?")
+		whereConditions = append(whereConditions, "time <= ?")
 		args = append(args, req.EndTime)
 	}
 
@@ -269,10 +269,10 @@ func getAuthLogList(whereClause string, args []interface{}, page, pageSize int) 
 	offset := (page - 1) * pageSize
 	
 	query := fmt.Sprintf(`
-		SELECT id, userid, channel, ip, deviceId, loginTime, logoutTime, duration, status
+		SELECT id, userid, nickname, ip, loginType, status, ext, create_time
 		FROM logAuth 
 		%s
-		ORDER BY loginTime DESC
+		ORDER BY create_time DESC
 		LIMIT ? OFFSET ?
 	`, whereClause)
 
@@ -288,20 +288,13 @@ func getAuthLogList(whereClause string, args []interface{}, page, pageSize int) 
 	var logs []models.LogAuth
 	for rows.Next() {
 		var logAuth models.LogAuth
-		var logoutTime *time.Time
 		
 		err := rows.Scan(
-			&logAuth.ID, &logAuth.UserID, &logAuth.Channel, &logAuth.IP,
-			&logAuth.DeviceID, &logAuth.LoginTime, &logoutTime,
-			&logAuth.Duration, &logAuth.Status,
+			&logAuth.ID, &logAuth.UserID, &logAuth.Nickname, &logAuth.IP,
+			&logAuth.LoginType, &logAuth.Status, &logAuth.Ext, &logAuth.CreateTime,
 		)
 		if err != nil {
 			return nil, err
-		}
-		
-		// 处理可能为NULL的logoutTime
-		if logoutTime != nil {
-			logAuth.LogoutTime = *logoutTime
 		}
 		
 		logs = append(logs, logAuth)
@@ -325,7 +318,7 @@ func getUserLoginStats(userID int64) (map[string]interface{}, error) {
 
 	// 查询最后登录时间
 	var lastLoginTime time.Time
-	query = "SELECT MAX(loginTime) FROM logAuth WHERE userid = ?"
+	query = "SELECT MAX(create_time) FROM logAuth WHERE userid = ?"
 	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&lastLoginTime)
 	if err != nil {
 		log.Warnf("查询最后登录时间失败: %v", err)
@@ -337,7 +330,7 @@ func getUserLoginStats(userID int64) (map[string]interface{}, error) {
 	// 查询今日登录次数
 	today := time.Now().Format("2006-01-02")
 	var todayLogins int64
-	query = "SELECT COUNT(*) FROM logAuth WHERE userid = ? AND DATE(loginTime) = ?"
+	query = "SELECT COUNT(*) FROM logAuth WHERE userid = ? AND DATE(create_time) = ?"
 	err = db.MySQLDBGameLog.QueryRow(query, userID, today).Scan(&todayLogins)
 	if err != nil {
 		log.Warnf("查询今日登录次数失败: %v", err)
@@ -349,7 +342,7 @@ func getUserLoginStats(userID int64) (map[string]interface{}, error) {
 	// 查询本周登录次数
 	weekStart := time.Now().AddDate(0, 0, -int(time.Now().Weekday())).Format("2006-01-02")
 	var weekLogins int64
-	query = "SELECT COUNT(*) FROM logAuth WHERE userid = ? AND DATE(loginTime) >= ?"
+	query = "SELECT COUNT(*) FROM logAuth WHERE userid = ? AND DATE(create_time) >= ?"
 	err = db.MySQLDBGameLog.QueryRow(query, userID, weekStart).Scan(&weekLogins)
 	if err != nil {
 		log.Warnf("查询本周登录次数失败: %v", err)
@@ -358,15 +351,15 @@ func getUserLoginStats(userID int64) (map[string]interface{}, error) {
 		stats["weekLogins"] = weekLogins
 	}
 
-	// 查询平均在线时长（分钟）
-	var avgDuration float64
-	query = "SELECT AVG(duration) FROM logAuth WHERE userid = ? AND duration > 0"
-	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&avgDuration)
+	// 成功登录次数
+	var successLogins int64
+	query = "SELECT COUNT(*) FROM logAuth WHERE userid = ? AND status = 1"
+	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&successLogins)
 	if err != nil {
-		log.Warnf("查询平均在线时长失败: %v", err)
-		stats["avgDuration"] = 0
+		log.Warnf("查询成功登录次数失败: %v", err)
+		stats["successLogins"] = 0
 	} else {
-		stats["avgDuration"] = avgDuration / 60 // 转换为分钟
+		stats["successLogins"] = successLogins
 	}
 
 	return stats, nil
@@ -388,11 +381,10 @@ func getGameLogList(whereClause string, args []interface{}, page, pageSize int) 
 	offset := (page - 1) * pageSize
 	
 	query := fmt.Sprintf(`
-		SELECT id, userid, gameid, roomid, gameMode, result, score, 
-		       winRiches, loseRiches, startTime, endTime, create_time
+		SELECT id, type, userid, gameid, roomid, result, score1, score2, score3, score4, score5, time, ext
 		FROM logResult10001 
 		%s
-		ORDER BY startTime DESC
+		ORDER BY time DESC
 		LIMIT ? OFFSET ?
 	`, whereClause)
 
@@ -410,10 +402,9 @@ func getGameLogList(whereClause string, args []interface{}, page, pageSize int) 
 		var logResult models.LogResult10001
 		
 		err := rows.Scan(
-			&logResult.ID, &logResult.UserID, &logResult.GameID, &logResult.RoomID,
-			&logResult.GameMode, &logResult.Result, &logResult.Score,
-			&logResult.WinRiches, &logResult.LoseRiches, &logResult.StartTime,
-			&logResult.EndTime, &logResult.CreateTime,
+			&logResult.ID, &logResult.Type, &logResult.UserID, &logResult.GameID, &logResult.RoomID,
+			&logResult.Result, &logResult.Score1, &logResult.Score2, &logResult.Score3,
+			&logResult.Score4, &logResult.Score5, &logResult.Time, &logResult.Ext,
 		)
 		if err != nil {
 			return nil, err
@@ -457,35 +448,29 @@ func getUserGameStats(userID int64) (map[string]interface{}, error) {
 		stats["winRate"] = "0.00%"
 	}
 
-	// 查询总盈利
-	var totalWinRiches, totalLoseRiches int64
-	query = "SELECT COALESCE(SUM(winRiches), 0), COALESCE(SUM(loseRiches), 0) FROM logResult10001 WHERE userid = ?"
-	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&totalWinRiches, &totalLoseRiches)
+	// 查询总赢得财富（score1-5求和）
+	var totalScore1, totalScore2, totalScore3, totalScore4, totalScore5 int64
+	query = "SELECT COALESCE(SUM(score1), 0), COALESCE(SUM(score2), 0), COALESCE(SUM(score3), 0), COALESCE(SUM(score4), 0), COALESCE(SUM(score5), 0) FROM logResult10001 WHERE userid = ?"
+	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&totalScore1, &totalScore2, &totalScore3, &totalScore4, &totalScore5)
 	if err != nil {
-		log.Warnf("查询总盈利失败: %v", err)
-		stats["totalWinRiches"] = 0
-		stats["totalLoseRiches"] = 0
-		stats["netProfit"] = 0
+		log.Warnf("查询总赢得财富失败: %v", err)
+		stats["totalScore1"] = 0
+		stats["totalScore2"] = 0
+		stats["totalScore3"] = 0
+		stats["totalScore4"] = 0
+		stats["totalScore5"] = 0
 	} else {
-		stats["totalWinRiches"] = totalWinRiches
-		stats["totalLoseRiches"] = totalLoseRiches
-		stats["netProfit"] = totalWinRiches - totalLoseRiches
-	}
-
-	// 查询最高得分
-	var maxScore int32
-	query = "SELECT COALESCE(MAX(score), 0) FROM logResult10001 WHERE userid = ?"
-	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&maxScore)
-	if err != nil {
-		log.Warnf("查询最高得分失败: %v", err)
-		stats["maxScore"] = 0
-	} else {
-		stats["maxScore"] = maxScore
+		stats["totalScore1"] = totalScore1
+		stats["totalScore2"] = totalScore2
+		stats["totalScore3"] = totalScore3
+		stats["totalScore4"] = totalScore4
+		stats["totalScore5"] = totalScore5
+		stats["totalScore"] = totalScore1 + totalScore2 + totalScore3 + totalScore4 + totalScore5
 	}
 
 	// 查询最后对局时间
 	var lastGameTime time.Time
-	query = "SELECT MAX(startTime) FROM logResult10001 WHERE userid = ?"
+	query = "SELECT MAX(time) FROM logResult10001 WHERE userid = ?"
 	err = db.MySQLDBGameLog.QueryRow(query, userID).Scan(&lastGameTime)
 	if err != nil {
 		log.Warnf("查询最后对局时间失败: %v", err)
@@ -497,7 +482,7 @@ func getUserGameStats(userID int64) (map[string]interface{}, error) {
 	// 查询今日对局次数
 	today := time.Now().Format("2006-01-02")
 	var todayGames int64
-	query = "SELECT COUNT(*) FROM logResult10001 WHERE userid = ? AND DATE(startTime) = ?"
+	query = "SELECT COUNT(*) FROM logResult10001 WHERE userid = ? AND DATE(time) = ?"
 	err = db.MySQLDBGameLog.QueryRow(query, userID, today).Scan(&todayGames)
 	if err != nil {
 		log.Warnf("查询今日对局次数失败: %v", err)

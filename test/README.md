@@ -7,6 +7,9 @@
 ### API 接口测试
 - [`test_admin_update.sh`](./test_admin_update.sh) - 管理员信息更新接口测试
 - [`test_get_admin_info.sh`](./test_get_admin_info.sh) - 获取管理员信息接口测试
+- [`test_auth_logs_api.sh`](./test_auth_logs_api.sh) - 登入认证日志API测试
+- [`test_game_logs_api.sh`](./test_game_logs_api.sh) - 对局结果日志API测试
+- [`test_all_logs_api.sh`](./test_all_logs_api.sh) - 综合日志API测试套件
 
 ## 🚀 测试脚本使用
 
@@ -40,6 +43,15 @@ cd /root/gameWeb
 
 # 测试获取管理员信息接口
 ./test/test_get_admin_info.sh
+
+# 测试登入认证日志API
+./test/test_auth_logs_api.sh
+
+# 测试对局结果日志API
+./test/test_game_logs_api.sh
+
+# 运行综合日志API测试套件
+./test/test_all_logs_api.sh
 ```
 
 #### 批量测试
@@ -72,6 +84,42 @@ done
 - ✅ 数据类型验证
 - ✅ 身份验证测试
 - ✅ JWT令牌验证测试
+
+### test_auth_logs_api.sh
+测试登入认证日志查询接口的完整功能：
+- ✅ 管理员登录获取token
+- ✅ 获取所有用户登录日志
+- ✅ 按用户ID过滤查询
+- ✅ 按时间范围过滤查询
+- ✅ 分页参数测试
+- ✅ 用户登录统计查询
+- ✅ 参数验证测试
+- ✅ 权限认证测试
+- ✅ 性能测试
+- ✅ 数据格式验证
+
+### test_game_logs_api.sh
+测试对局结果日志查询接口的完整功能：
+- ✅ 管理员登录获取token
+- ✅ 获取所有用户对局日志
+- ✅ 按用户ID过滤查询
+- ✅ 按时间范围过滤查询
+- ✅ 复合条件查询测试
+- ✅ 用户对局统计查询
+- ✅ 数据一致性验证
+- ✅ 权限认证测试
+- ✅ 并发查询测试
+- ✅ 数据格式验证
+
+### test_all_logs_api.sh
+综合日志API测试套件，包含：
+- ✅ 登入认证日志API测试
+- ✅ 对局结果日志API测试
+- ✅ 统计API测试
+- ✅ 数据一致性测试
+- ✅ 权限认证测试
+- ✅ 性能测试
+- ✅ 自动化测试报告生成
 
 ## 🔧 测试配置
 

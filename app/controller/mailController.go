@@ -554,11 +554,47 @@ func SendSystemMail(c *gin.Context) {
 		return
 	}
 
+	// 验证邮件类型
+	if req.Type != 0 && req.Type != 1 {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "邮件类型错误，只支持0-全服邮件, 1-个人邮件",
+		})
+		return
+	}
+
+	// 验证个人邮件的目标用户
+	if req.Type == 1 {
+		if len(req.TargetUsers) == 0 {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "个人邮件必须指定目标用户",
+			})
+			return
+		}
+		if len(req.TargetUsers) > 1000 {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "单次发送个人邮件最多支持1000个用户",
+			})
+			return
+		}
+	}
+
 	// 验证时间范围
 	if req.EndTime.Before(req.StartTime) {
 		c.JSON(http.StatusBadRequest, models.APIResponse{
 			Code:    400,
 			Message: "结束时间不能早于开始时间",
+		})
+		return
+	}
+
+	// 验证开始时间不能过于久远
+	if req.StartTime.Before(time.Now().AddDate(0, 0, -1)) {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "开始时间不能早于昨天",
 		})
 		return
 	}
@@ -569,14 +605,32 @@ func SendSystemMail(c *gin.Context) {
 		if err := json.Unmarshal([]byte(req.Awards), &awards); err != nil {
 			c.JSON(http.StatusBadRequest, models.APIResponse{
 				Code:    400,
-				Message: "奖励格式错误",
+				Message: "奖励格式错误，正确格式: {\"props\":[{\"id\":1,\"cnt\":100}]}",
 			})
 			return
+		}
+		// 验证奖励道具数量
+		if len(awards.Props) > 10 {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "奖励道具种类不能超过10种",
+			})
+			return
+		}
+		for _, prop := range awards.Props {
+			if prop.ID <= 0 || prop.Cnt <= 0 {
+				c.JSON(http.StatusBadRequest, models.APIResponse{
+					Code:    400,
+					Message: "奖励道具ID和数量必须大于0",
+				})
+				return
+			}
 		}
 	}
 
 	// 获取管理员信息
 	adminId, _ := c.Get("adminId")
+	username, _ := c.Get("username")
 
 	// 开始事务
 	tx, err := db.MySQLDBGameWeb.Begin()
@@ -601,6 +655,23 @@ func SendSystemMail(c *gin.Context) {
 		return
 	}
 
+	// 如果是个人邮件，直接发送给指定用户
+	var affectedUsers int64
+	if req.Type == 1 {
+		affectedUsers, err = sendPersonalMail(tx, mailID, req.TargetUsers, req.StartTime, req.EndTime)
+		if err != nil {
+			log.Errorf("发送个人邮件失败: %v", err)
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Code:    500,
+				Message: "发送个人邮件失败",
+			})
+			return
+		}
+	} else {
+		// 全服邮件不需要立即发送，用户登录时会自动同步
+		affectedUsers = 0
+	}
+
 	// 提交事务
 	if err := tx.Commit(); err != nil {
 		log.Errorf("提交事务失败: %v", err)
@@ -611,13 +682,31 @@ func SendSystemMail(c *gin.Context) {
 		return
 	}
 
-	log.Infof("管理员发送系统邮件: 管理员ID=%v, 邮件ID=%d, 类型=%d, IP=%s",
-		adminId, mailID, req.Type, c.ClientIP())
+	// 记录操作日志
+	mailTypeStr := "全服邮件"
+	if req.Type == 1 {
+		mailTypeStr = "个人邮件"
+	}
+	log.Infof("管理员发送%s: 管理员ID=%v, 管理员=%v, 邮件ID=%d, 类型=%d, 影响用户=%d, IP=%s",
+		mailTypeStr, adminId, username, mailID, req.Type, affectedUsers, c.ClientIP())
+
+	// 构建响应数据
+	responseData := gin.H{
+		"mailId": mailID,
+		"type":   req.Type,
+	}
+
+	if req.Type == 1 {
+		responseData["affectedUsers"] = affectedUsers
+		responseData["message"] = fmt.Sprintf("个人邮件发送成功，影响%d个用户", affectedUsers)
+	} else {
+		responseData["message"] = "全服邮件发送成功，用户登录时会自动收到"
+	}
 
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
 		Message: "发送成功",
-		Data:    gin.H{"mailId": mailID},
+		Data:    responseData,
 	})
 }
 
@@ -1035,13 +1124,53 @@ func createSystemMail(tx *sql.Tx, req *models.SendMailRequest, adminID interface
 	return mailID, nil
 }
 
-// GetAdminMailList 获取管理后台邮件列表
+// sendPersonalMail 发送个人邮件给指定用户
+func sendPersonalMail(tx *sql.Tx, mailID int64, targetUsers []int64, startTime, endTime time.Time) (int64, error) {
+	// 批量插入用户邮件记录
+	query := `
+		INSERT INTO mailUsers (userid, mailid, status, startTime, endTime, update_at) 
+		VALUES (?, ?, 0, ?, ?, CURRENT_TIMESTAMP)
+	`
+
+	var successCount int64
+	for _, userID := range targetUsers {
+		// 检查用户是否已经有这封邮件（避免重复发送）
+		var exists bool
+		checkQuery := "SELECT EXISTS(SELECT 1 FROM mailUsers WHERE userid = ? AND mailid = ?)"
+		err := tx.QueryRow(checkQuery, userID, mailID).Scan(&exists)
+		if err != nil {
+			log.Errorf("检查用户邮件存在性失败: userID=%d, mailID=%d, err=%v", userID, mailID, err)
+			continue
+		}
+		
+		if exists {
+			log.Warnf("用户已经有这封邮件，跳过: userID=%d, mailID=%d", userID, mailID)
+			continue
+		}
+
+		// 插入用户邮件记录
+		_, err = tx.Exec(query, userID, mailID, startTime, endTime)
+		if err != nil {
+			log.Errorf("插入用户邮件记录失败: userID=%d, mailID=%d, err=%v", userID, mailID, err)
+			continue
+		}
+		
+		successCount++
+	}
+
+	log.Infof("个人邮件发送完成: mailID=%d, 目标用户数=%d, 成功发送=%d", 
+		mailID, len(targetUsers), successCount)
+
+	return successCount, nil
+}
+
+// GetAdminMailList 获取管理后台邮件列表（只返回用户邮件且当前生效的）
 func GetAdminMailList(c *gin.Context) {
 	// 解析查询参数
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
-	mailType := c.Query("type")
 	title := c.Query("title")
+	userID := c.Query("userid") // 可选的用户ID筛选
 
 	// 参数验证
 	if page < 1 {
@@ -1051,37 +1180,41 @@ func GetAdminMailList(c *gin.Context) {
 		pageSize = 10
 	}
 
-	// 构建查询条件
+	// 构建查询条件 - 只查询用户邮件且当前生效的
 	var whereConditions []string
 	var args []interface{}
 
-	if mailType != "" {
-		whereConditions = append(whereConditions, "m.type = ?")
-		args = append(args, mailType)
-	}
+	// 基础条件：只查询用户邮件表中的邮件，且当前生效
+	now := time.Now()
+	whereConditions = append(whereConditions, "mu.startTime <= ? AND mu.endTime > ? AND mu.status != 3")
+	args = append(args, now, now)
 
+	// 可选条件：邮件标题模糊搜索
 	if title != "" {
 		whereConditions = append(whereConditions, "m.title LIKE ?")
 		args = append(args, "%"+title+"%")
 	}
 
-	whereClause := ""
-	if len(whereConditions) > 0 {
-		whereClause = "WHERE " + strings.Join(whereConditions, " AND ")
+	// 可选条件：指定用户ID
+	if userID != "" {
+		whereConditions = append(whereConditions, "mu.userid = ?")
+		args = append(args, userID)
 	}
 
-	// 查询总数
+	whereClause := "WHERE " + strings.Join(whereConditions, " AND ")
+
+	// 查询总数 - 统计当前生效的用户邮件数量
 	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*) 
-		FROM mails m 
-		LEFT JOIN mailSystem ms ON m.id = ms.mailid 
+		SELECT COUNT(DISTINCT mu.id)
+		FROM mailUsers mu
+		INNER JOIN mails m ON mu.mailid = m.id
 		%s
 	`, whereClause)
 
 	var total int64
 	err := db.MySQLDBGameWeb.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
-		log.Errorf("查询邮件总数失败: %v", err)
+		log.Errorf("查询用户邮件总数失败: %v", err)
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Code:    500,
 			Message: "系统错误",
@@ -1089,16 +1222,15 @@ func GetAdminMailList(c *gin.Context) {
 		return
 	}
 
-	// 查询邮件列表
+	// 查询用户邮件列表 - 只返回当前生效的用户邮件
 	offset := (page - 1) * pageSize
 	listQuery := fmt.Sprintf(`
-		SELECT m.id, m.type, m.title, m.content, m.awards, m.created_at,
-		       COALESCE(ms.startTime, m.created_at) as startTime,
-		       COALESCE(ms.endTime, DATE_ADD(m.created_at, INTERVAL 30 DAY)) as endTime
-		FROM mails m 
-		LEFT JOIN mailSystem ms ON m.id = ms.mailid
+		SELECT DISTINCT m.id, m.type, m.title, m.content, m.awards, m.created_at,
+		       mu.userid, mu.status, mu.startTime, mu.endTime, mu.update_at
+		FROM mailUsers mu
+		INNER JOIN mails m ON mu.mailid = m.id
 		%s
-		ORDER BY m.id DESC
+		ORDER BY mu.update_at DESC, m.id DESC
 		LIMIT ? OFFSET ?
 	`, whereClause)
 
@@ -1107,7 +1239,7 @@ func GetAdminMailList(c *gin.Context) {
 
 	rows, err := db.MySQLDBGameWeb.Query(listQuery, finalArgs...)
 	if err != nil {
-		log.Errorf("查询邮件列表失败: %v", err)
+		log.Errorf("查询用户邮件列表失败: %v", err)
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Code:    500,
 			Message: "查询失败",
@@ -1116,24 +1248,30 @@ func GetAdminMailList(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var mails []models.MailDetailResponse
+	// 定义用户邮件响应结构
+	type UserMailResponse struct {
+		ID        int64     `json:"id"`
+		Type      int       `json:"type"`
+		Title     string    `json:"title"`
+		Content   string    `json:"content"`
+		Awards    string    `json:"awards"`
+		CreatedAt time.Time `json:"createdAt"`
+		UserID    int64     `json:"userid"`
+		Status    int8      `json:"status"` // 0-未读, 1-已读, 2-已领取
+		StartTime time.Time `json:"startTime"`
+		EndTime   time.Time `json:"endTime"`
+		UpdateAt  time.Time `json:"updateAt"`
+	}
+
+	var mails []UserMailResponse
 	for rows.Next() {
-		var mail models.MailDetailResponse
+		var mail UserMailResponse
 		err := rows.Scan(&mail.ID, &mail.Type, &mail.Title, &mail.Content,
-			&mail.Awards, &mail.CreatedAt, &mail.StartTime, &mail.EndTime)
+			&mail.Awards, &mail.CreatedAt, &mail.UserID, &mail.Status,
+			&mail.StartTime, &mail.EndTime, &mail.UpdateAt)
 		if err != nil {
-			log.Errorf("扫描邮件记录失败: %v", err)
+			log.Errorf("扫描用户邮件记录失败: %v", err)
 			continue
-		}
-		
-		// 判断邮件状态（生效中/已过期）
-		now := time.Now()
-		if mail.StartTime.After(now) {
-			mail.Status = 0 // 未开始
-		} else if mail.EndTime.Before(now) {
-			mail.Status = 3 // 已过期
-		} else {
-			mail.Status = 1 // 生效中
 		}
 		
 		mails = append(mails, mail)
@@ -1142,8 +1280,8 @@ func GetAdminMailList(c *gin.Context) {
 	// 获取管理员信息记录日志
 	adminId, _ := c.Get("adminId")
 	username, _ := c.Get("username")
-	log.Infof("管理员查询邮件列表: 管理员ID=%v, 管理员=%v, 页码=%d, 条件=%s, IP=%s",
-		adminId, username, page, whereClause, c.ClientIP())
+	log.Infof("管理员查询用户邮件列表: 管理员ID=%v, 管理员=%v, 页码=%d, 用户ID=%s, 标题=%s, 总数=%d, IP=%s",
+		adminId, username, page, userID, title, total, c.ClientIP())
 
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
@@ -1153,6 +1291,10 @@ func GetAdminMailList(c *gin.Context) {
 			"total":    total,
 			"page":     page,
 			"pageSize": pageSize,
+			"summary": gin.H{
+				"description": "当前生效的用户邮件",
+				"filterTime": now.Format("2006-01-02 15:04:05"),
+			},
 		},
 	})
 }

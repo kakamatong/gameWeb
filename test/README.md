@@ -7,6 +7,7 @@
 ### API 接口测试
 - [`test_admin_update.sh`](./test_admin_update.sh) - 管理员信息更新接口测试
 - [`test_get_admin_info.sh`](./test_get_admin_info.sh) - 获取管理员信息接口测试
+- [`test_send_mail_api.sh`](./test_send_mail_api.sh) - 邮件发送接口测试
 - [`test_auth_logs_api.sh`](./test_auth_logs_api.sh) - 登入认证日志API测试
 - [`test_game_logs_api.sh`](./test_game_logs_api.sh) - 对局结果日志API测试
 - [`test_all_logs_api.sh`](./test_all_logs_api.sh) - 综合日志API测试套件
@@ -44,6 +45,9 @@ cd /root/gameWeb
 # 测试获取管理员信息接口
 ./test/test_get_admin_info.sh
 
+# 测试邮件发送接口
+./test/test_send_mail_api.sh
+
 # 测试登入认证日志API
 ./test/test_auth_logs_api.sh
 
@@ -75,6 +79,19 @@ done
 - ✅ 权限控制测试
 - ✅ 身份验证测试
 - ✅ 更新结果验证
+
+### test_send_mail_api.sh
+测试邮件发送接口的完整功能：
+- ✅ 全服邮件发送测试（带奖励/无奖励）
+- ✅ 个人邮件发送测试
+- ✅ 邮件类型验证测试
+- ✅ 目标用户参数验证
+- ✅ 时间范围验证测试
+- ✅ 奖励格式验证测试
+- ✅ 参数完整性验证
+- ✅ 权限认证测试
+- ✅ JWT令牌验证测试
+- ✅ 边界值测试
 
 ### test_get_admin_info.sh
 测试获取管理员信息接口的功能：

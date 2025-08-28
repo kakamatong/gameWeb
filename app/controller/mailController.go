@@ -1037,26 +1037,337 @@ func createSystemMail(tx *sql.Tx, req *models.SendMailRequest, adminID interface
 
 // GetAdminMailList 获取管理后台邮件列表
 func GetAdminMailList(c *gin.Context) {
-	// TODO: 实现管理后台邮件列表接口
+	// 解析查询参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	mailType := c.Query("type")
+	title := c.Query("title")
+
+	// 参数验证
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	// 构建查询条件
+	var whereConditions []string
+	var args []interface{}
+
+	if mailType != "" {
+		whereConditions = append(whereConditions, "m.type = ?")
+		args = append(args, mailType)
+	}
+
+	if title != "" {
+		whereConditions = append(whereConditions, "m.title LIKE ?")
+		args = append(args, "%"+title+"%")
+	}
+
+	whereClause := ""
+	if len(whereConditions) > 0 {
+		whereClause = "WHERE " + strings.Join(whereConditions, " AND ")
+	}
+
+	// 查询总数
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) 
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid 
+		%s
+	`, whereClause)
+
+	var total int64
+	err := db.MySQLDBGameWeb.QueryRow(countQuery, args...).Scan(&total)
+	if err != nil {
+		log.Errorf("查询邮件总数失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+
+	// 查询邮件列表
+	offset := (page - 1) * pageSize
+	listQuery := fmt.Sprintf(`
+		SELECT m.id, m.type, m.title, m.content, m.awards, m.created_at,
+		       COALESCE(ms.startTime, m.created_at) as startTime,
+		       COALESCE(ms.endTime, DATE_ADD(m.created_at, INTERVAL 30 DAY)) as endTime
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid
+		%s
+		ORDER BY m.id DESC
+		LIMIT ? OFFSET ?
+	`, whereClause)
+
+	// 添加分页参数
+	finalArgs := append(args, pageSize, offset)
+
+	rows, err := db.MySQLDBGameWeb.Query(listQuery, finalArgs...)
+	if err != nil {
+		log.Errorf("查询邮件列表失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "查询失败",
+		})
+		return
+	}
+	defer rows.Close()
+
+	var mails []models.MailDetailResponse
+	for rows.Next() {
+		var mail models.MailDetailResponse
+		err := rows.Scan(&mail.ID, &mail.Type, &mail.Title, &mail.Content,
+			&mail.Awards, &mail.CreatedAt, &mail.StartTime, &mail.EndTime)
+		if err != nil {
+			log.Errorf("扫描邮件记录失败: %v", err)
+			continue
+		}
+		
+		// 判断邮件状态（生效中/已过期）
+		now := time.Now()
+		if mail.StartTime.After(now) {
+			mail.Status = 0 // 未开始
+		} else if mail.EndTime.Before(now) {
+			mail.Status = 3 // 已过期
+		} else {
+			mail.Status = 1 // 生效中
+		}
+		
+		mails = append(mails, mail)
+	}
+
+	// 获取管理员信息记录日志
+	adminId, _ := c.Get("adminId")
+	username, _ := c.Get("username")
+	log.Infof("管理员查询邮件列表: 管理员ID=%v, 管理员=%v, 页码=%d, 条件=%s, IP=%s",
+		adminId, username, page, whereClause, c.ClientIP())
+
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
-		Message: "获取成功",
-		Data:    []interface{}{},
+		Message: "查询成功",
+		Data: gin.H{
+			"list":     mails,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+		},
 	})
 }
 
 // GetAdminMailDetail 获取管理后台邮件详情
 func GetAdminMailDetail(c *gin.Context) {
-	// TODO: 实现管理后台邮件详情接口
+	// 获取邮件ID
+	mailIDStr := c.Param("id")
+	mailID, err := strconv.ParseInt(mailIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "无效的邮件ID",
+		})
+		return
+	}
+
+	// 查询邮件详情
+	query := `
+		SELECT m.id, m.type, m.title, m.content, m.awards, m.created_at,
+		       COALESCE(ms.startTime, m.created_at) as startTime,
+		       COALESCE(ms.endTime, DATE_ADD(m.created_at, INTERVAL 30 DAY)) as endTime,
+		       COALESCE(ms.type, m.type) as mailSystemType
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid
+		WHERE m.id = ?
+	`
+
+	var mail models.MailDetailResponse
+	var mailSystemType int
+	err = db.MySQLDBGameWeb.QueryRow(query, mailID).Scan(
+		&mail.ID, &mail.Type, &mail.Title, &mail.Content, &mail.Awards,
+		&mail.CreatedAt, &mail.StartTime, &mail.EndTime, &mailSystemType)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, models.APIResponse{
+				Code:    404,
+				Message: "邮件不存在",
+			})
+			return
+		}
+		log.Errorf("查询邮件详情失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+
+	// 判断邮件状态
+	now := time.Now()
+	if mail.StartTime.After(now) {
+		mail.Status = 0 // 未开始
+	} else if mail.EndTime.Before(now) {
+		mail.Status = 3 // 已过期
+	} else {
+		mail.Status = 1 // 生效中
+	}
+
+	// 查询邮件统计信息（用户领取情况）
+	statsQuery := `
+		SELECT 
+			COUNT(*) as totalUsers,
+			COUNT(CASE WHEN status >= 1 THEN 1 END) as readUsers,
+			COUNT(CASE WHEN status >= 2 THEN 1 END) as claimedUsers
+		FROM mailUsers 
+		WHERE mailid = ?
+	`
+
+	var stats struct {
+		TotalUsers   int64 `json:"totalUsers"`
+		ReadUsers    int64 `json:"readUsers"`
+		ClaimedUsers int64 `json:"claimedUsers"`
+	}
+
+	err = db.MySQLDBGameWeb.QueryRow(statsQuery, mailID).Scan(
+		&stats.TotalUsers, &stats.ReadUsers, &stats.ClaimedUsers)
+	if err != nil {
+		// 统计信息查询失败不影响主数据返回
+		log.Warnf("查询邮件统计信息失败: %v", err)
+	}
+
+	// 获取管理员信息记录日志
+	adminId, _ := c.Get("adminId")
+	username, _ := c.Get("username")
+	log.Infof("管理员查询邮件详情: 管理员ID=%v, 管理员=%v, 邮件ID=%d, IP=%s",
+		adminId, username, mailID, c.ClientIP())
+
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
-		Message: "获取成功",
+		Message: "查询成功",
+		Data: gin.H{
+			"mail":  mail,
+			"stats": stats,
+		},
 	})
 }
 
 // UpdateMailStatus 更新邮件状态
 func UpdateMailStatus(c *gin.Context) {
-	// TODO: 实现更新邮件状态接口
+	// 获取邮件ID
+	mailIDStr := c.Param("id")
+	mailID, err := strconv.ParseInt(mailIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "无效的邮件ID",
+		})
+		return
+	}
+
+	// 解析请求参数
+	var req struct {
+		Action    string    `json:"action" binding:"required"`    // 操作类型: extend, disable
+		EndTime   *time.Time `json:"endTime"`                       // 延长截止时间
+		StartTime *time.Time `json:"startTime"`                     // 修改开始时间
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Errorf("更新邮件状态参数绑定失败: %v", err)
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	// 验证操作类型
+	if req.Action != "extend" && req.Action != "disable" && req.Action != "modify" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    400,
+			Message: "不支持的操作类型",
+		})
+		return
+	}
+
+	// 检查邮件是否存在
+	var exists bool
+	checkQuery := "SELECT EXISTS(SELECT 1 FROM mails WHERE id = ?)"
+	err = db.MySQLDBGameWeb.QueryRow(checkQuery, mailID).Scan(&exists)
+	if err != nil {
+		log.Errorf("检查邮件存在性失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+	if !exists {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Code:    404,
+			Message: "邮件不存在",
+		})
+		return
+	}
+
+	// 执行操作
+	switch req.Action {
+	case "extend":
+		// 延长邮件有效期
+		if req.EndTime == nil {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "延长操作需要提供新的截止时间",
+			})
+			return
+		}
+		
+		updateQuery := "UPDATE mailSystem SET endTime = ? WHERE mailid = ?"
+		_, err = db.MySQLDBGameWeb.Exec(updateQuery, req.EndTime, mailID)
+		
+	case "disable":
+		// 禁用邮件（设置截止时间为当前时间）
+		now := time.Now()
+		updateQuery := "UPDATE mailSystem SET endTime = ? WHERE mailid = ?"
+		_, err = db.MySQLDBGameWeb.Exec(updateQuery, now, mailID)
+		
+	case "modify":
+		// 修改邮件时间范围
+		if req.StartTime == nil || req.EndTime == nil {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "修改操作需要提供开始和截止时间",
+			})
+			return
+		}
+		
+		if req.EndTime.Before(*req.StartTime) {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Code:    400,
+				Message: "截止时间不能早于开始时间",
+			})
+			return
+		}
+		
+		updateQuery := "UPDATE mailSystem SET startTime = ?, endTime = ? WHERE mailid = ?"
+		_, err = db.MySQLDBGameWeb.Exec(updateQuery, req.StartTime, req.EndTime, mailID)
+	}
+
+	if err != nil {
+		log.Errorf("更新邮件状态失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "更新失败",
+		})
+		return
+	}
+
+	// 获取管理员信息记录操作日志
+	adminId, _ := c.Get("adminId")
+	username, _ := c.Get("username")
+	log.Infof("管理员更新邮件状态: 管理员ID=%v, 管理员=%v, 邮件ID=%d, 操作=%s, IP=%s",
+		adminId, username, mailID, req.Action, c.ClientIP())
+
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
 		Message: "更新成功",
@@ -1065,10 +1376,124 @@ func UpdateMailStatus(c *gin.Context) {
 
 // GetMailStats 获取邮件统计
 func GetMailStats(c *gin.Context) {
-	// TODO: 实现邮件统计接口
+	// 查询邮件统计信息
+	var stats struct {
+		TotalMails    int64 `json:"totalMails"`    // 总邮件数
+		SystemMails   int64 `json:"systemMails"`   // 系统邮件数
+		PersonalMails int64 `json:"personalMails"` // 个人邮件数
+		ActiveMails   int64 `json:"activeMails"`   // 生效中邮件数
+		ExpiredMails  int64 `json:"expiredMails"`  // 已过期邮件数
+		PendingMails  int64 `json:"pendingMails"`  // 未开始邮件数
+	}
+
+	// 查询总邮件数
+	err := db.MySQLDBGameWeb.QueryRow("SELECT COUNT(*) FROM mails").Scan(&stats.TotalMails)
+	if err != nil {
+		log.Errorf("查询总邮件数失败: %v", err)
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Code:    500,
+			Message: "系统错误",
+		})
+		return
+	}
+
+	// 查询系统邮件数
+	err = db.MySQLDBGameWeb.QueryRow("SELECT COUNT(*) FROM mails WHERE type = 0").Scan(&stats.SystemMails)
+	if err != nil {
+		log.Errorf("查询系统邮件数失败: %v", err)
+		stats.SystemMails = 0
+	}
+
+	// 查询个人邮件数
+	err = db.MySQLDBGameWeb.QueryRow("SELECT COUNT(*) FROM mails WHERE type = 1").Scan(&stats.PersonalMails)
+	if err != nil {
+		log.Errorf("查询个人邮件数失败: %v", err)
+		stats.PersonalMails = 0
+	}
+
+	// 查询生效中邮件数
+	now := time.Now()
+	activeQuery := `
+		SELECT COUNT(*) 
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid 
+		WHERE COALESCE(ms.startTime, m.created_at) <= ? 
+		  AND COALESCE(ms.endTime, DATE_ADD(m.created_at, INTERVAL 30 DAY)) > ?
+	`
+	err = db.MySQLDBGameWeb.QueryRow(activeQuery, now, now).Scan(&stats.ActiveMails)
+	if err != nil {
+		log.Errorf("查询生效中邮件数失败: %v", err)
+		stats.ActiveMails = 0
+	}
+
+	// 查询已过期邮件数
+	expiredQuery := `
+		SELECT COUNT(*) 
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid 
+		WHERE COALESCE(ms.endTime, DATE_ADD(m.created_at, INTERVAL 30 DAY)) <= ?
+	`
+	err = db.MySQLDBGameWeb.QueryRow(expiredQuery, now).Scan(&stats.ExpiredMails)
+	if err != nil {
+		log.Errorf("查询已过期邮件数失败: %v", err)
+		stats.ExpiredMails = 0
+	}
+
+	// 查询未开始邮件数
+	pendingQuery := `
+		SELECT COUNT(*) 
+		FROM mails m 
+		LEFT JOIN mailSystem ms ON m.id = ms.mailid 
+		WHERE COALESCE(ms.startTime, m.created_at) > ?
+	`
+	err = db.MySQLDBGameWeb.QueryRow(pendingQuery, now).Scan(&stats.PendingMails)
+	if err != nil {
+		log.Errorf("查询未开始邮件数失败: %v", err)
+		stats.PendingMails = 0
+	}
+
+	// 查询用户邮件统计（最近30天内）
+	recentDate := now.AddDate(0, 0, -30)
+	userStatsQuery := `
+		SELECT 
+			COUNT(DISTINCT userid) as totalUsers,
+			COUNT(*) as totalUserMails,
+			COUNT(CASE WHEN status >= 1 THEN 1 END) as readMails,
+			COUNT(CASE WHEN status >= 2 THEN 1 END) as claimedMails
+		FROM mailUsers 
+		WHERE update_at >= ?
+	`
+
+	var userStats struct {
+		TotalUsers     int64 `json:"totalUsers"`     // 最近30天内有邮件的用户数
+		TotalUserMails int64 `json:"totalUserMails"` // 最近30天内用户邮件总数
+		ReadMails      int64 `json:"readMails"`      // 已读邮件数
+		ClaimedMails   int64 `json:"claimedMails"`   // 已领取邮件数
+	}
+
+	err = db.MySQLDBGameWeb.QueryRow(userStatsQuery, recentDate).Scan(
+		&userStats.TotalUsers, &userStats.TotalUserMails, &userStats.ReadMails, &userStats.ClaimedMails)
+	if err != nil {
+		log.Errorf("查询用户邮件统计失败: %v", err)
+		// 设置默认值
+		userStats.TotalUsers = 0
+		userStats.TotalUserMails = 0
+		userStats.ReadMails = 0
+		userStats.ClaimedMails = 0
+	}
+
+	// 获取管理员信息记录日志
+	adminId, _ := c.Get("adminId")
+	username, _ := c.Get("username")
+	log.Infof("管理员查询邮件统计: 管理员ID=%v, 管理员=%v, IP=%s",
+		adminId, username, c.ClientIP())
+
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
 		Message: "获取成功",
-		Data:    gin.H{},
+		Data: gin.H{
+			"mailStats": stats,
+			"userStats": userStats,
+		},
 	})
 }

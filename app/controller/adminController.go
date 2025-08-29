@@ -217,7 +217,7 @@ func CreateAdmin(c *gin.Context) {
 		Email        string `json:"email" binding:"required,email"`
 		RealName     string `json:"realName" binding:"required,min=1,max=50"`
 		Mobile       string `json:"mobile"`
-		IsSuperAdmin int8   `json:"isSuperAdmin"`
+		IsSuperAdmin bool   `json:"isSuperAdmin"`
 		DepartmentID *int   `json:"departmentId"`
 		Note         string `json:"note"`
 	}
@@ -279,13 +279,21 @@ func CreateAdmin(c *gin.Context) {
 	createdByID := createdBy.(uint64)
 
 	// 创建管理员
+	// 将bool类型的IsSuperAdmin转换为int8类型存储到数据库
+	var isSuperAdminValue int8
+	if req.IsSuperAdmin {
+		isSuperAdminValue = 1
+	} else {
+		isSuperAdminValue = 0
+	}
+	
 	admin := &models.AdminAccount{
 		Username:     req.Username,
 		PasswordHash: string(passwordHash),
 		Email:        req.Email,
 		Mobile:       req.Mobile,
 		Status:       1,
-		IsSuperAdmin: req.IsSuperAdmin,
+		IsSuperAdmin: isSuperAdminValue,
 		RealName:     req.RealName,
 		DepartmentID: req.DepartmentID,
 		Note:         req.Note,

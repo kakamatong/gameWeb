@@ -47,7 +47,9 @@ func RegisterRoutes(router *gin.Engine) {
 				superAdmin := authorized.Group("/")
 				superAdmin.Use(middleware.RequireSuperAdmin())
 				{
+					superAdmin.GET("/admins", controller.GetAdminList)
 					superAdmin.POST("/create-admin", controller.CreateAdmin)
+					superAdmin.DELETE("/delete/:id", controller.DeleteAdmin)
 				}
 				
 				// 用户管理相关路由

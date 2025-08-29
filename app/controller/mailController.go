@@ -644,15 +644,30 @@ func SendSystemMail(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	// 创建邮件和系统邮件记录
-	mailID, err := createSystemMail(tx, &req, adminId)
-	if err != nil {
-		log.Errorf("创建系统邮件失败: %v", err)
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Code:    500,
-			Message: "发送失败",
-		})
-		return
+	// 创建邮件记录（根据类型选择不同的创建方式）
+	var mailID int64
+	if req.Type == 1 {
+		// 个人邮件：不插入mailSystem表，直接发送给玩家
+		mailID, err = createPersonalMail(tx, &req, adminId)
+		if err != nil {
+			log.Errorf("创建个人邮件失败: %v", err)
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Code:    500,
+				Message: "发送失败",
+			})
+			return
+		}
+	} else {
+		// 全服邮件：插入mailSystem表，用户登录时同步
+		mailID, err = createSystemMail(tx, &req, adminId)
+		if err != nil {
+			log.Errorf("创建系统邮件失败: %v", err)
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Code:    500,
+				Message: "发送失败",
+			})
+			return
+		}
 	}
 
 	// 如果是个人邮件，直接发送给指定用户
@@ -710,7 +725,7 @@ func SendSystemMail(c *gin.Context) {
 	})
 }
 
-// syncSystemMails 同步系统邮件到用户邮件表
+// syncSystemMails 同步系统邮件到用户邮件表（只同步全服邮件，个人邮件不在mailSystem表中）
 func syncSystemMails(userID int64) error {
 	// 获取当前生效的系统邮件
 	activeSystemMails, err := getActiveSystemMails()
@@ -916,7 +931,7 @@ func syncSystemMailsToUser(userID int64) error {
 	return nil
 }
 
-// getActiveSystemMails 获取当前生效的系统邮件
+// getActiveSystemMails 获取当前生效的系统邮件（只包含全服邮件，个人邮件不在mailSystem表中）
 func getActiveSystemMails() ([]models.MailSystem, error) {
 	now := time.Now()
 	query := `
@@ -1117,6 +1132,27 @@ func createSystemMail(tx *sql.Tx, req *models.SendMailRequest, adminID interface
 	`
 	
 	_, err = tx.Exec(systemMailQuery, req.Type, mailID, req.StartTime, req.EndTime)
+	if err != nil {
+		return 0, err
+	}
+
+	return mailID, nil
+}
+
+// createPersonalMail 创建个人邮件（不插入mailSystem表）
+func createPersonalMail(tx *sql.Tx, req *models.SendMailRequest, adminID interface{}) (int64, error) {
+	// 只创建邮件记录，不插入mailSystem表
+	mailQuery := `
+		INSERT INTO mails (type, senderid, title, content, awards, created_at)
+		VALUES (?, 0, ?, ?, ?, NOW())
+	`
+	
+	result, err := tx.Exec(mailQuery, req.Type, req.Title, req.Content, req.Awards)
+	if err != nil {
+		return 0, err
+	}
+
+	mailID, err := result.LastInsertId()
 	if err != nil {
 		return 0, err
 	}

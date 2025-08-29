@@ -219,7 +219,7 @@ type LogQueryRequest struct {
 
 // SendMailRequest 发送邮件请求
 type SendMailRequest struct {
-	Type        int8      `json:"type" binding:"required"` // 0-全服邮件, 1-个人邮件
+	Type        int8      `json:"type" binding:"min=0,max=1"` // 0-全服邮件, 1-个人邮件
 	Title       string    `json:"title" binding:"required,min=1,max=100"`
 	Content     string    `json:"content" binding:"required,min=1,max=1000"`
 	Awards      string    `json:"awards"` // JSON格式: {"props":[{"id":2,"cnt":20000},{"id":1,"cnt":100}]}

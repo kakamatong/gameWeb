@@ -12,8 +12,9 @@ func RegisterRoutes(router *gin.Engine) {
 	// API分组
 	api := router.Group("/api")
 	{
-		// 游戏相关路由 - 需要验签
+		// 游戏相关路由
 		game := api.Group("/game")
+		game.Use(middleware.AuthMiddlewareByJWT())
 		{
 			game.POST("/authlist", controller.GetAuthGameList)
 		}

@@ -2,9 +2,14 @@ package controller
 
 // 在导入部分添加net/url包
 import (
+	"crypto/md5"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"gameWeb/config"
 	"gameWeb/db"
 	"gameWeb/log"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -107,11 +112,20 @@ func GetAuthGameList(c *gin.Context) {
 	})
 }
 
-func ThirdLogin(c *gin.Context){
+func getWechatInfo(appid int) (config.WechatInfo, error) {
+	for _, info := range config.AppConfig.WechatInfos {
+		if info.ID == appid {
+			return info, nil
+		}
+	}
+	return config.WechatInfo{}, errors.New("未找到对应的微信配置信息")
+}
+
+func ThirdLogin(c *gin.Context) {
 	var req struct {
-		appid int64 `json:"appid" binding:"required"`
-		loginType string `json:"loginType" binding:"required"`
-		loginData string `json:"loginData" binding:"required"`
+		Appid     int    `json:"appid" binding:"required"`
+		LoginType string `json:"loginType" binding:"required"`
+		LoginData string `json:"loginData" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -122,8 +136,71 @@ func ThirdLogin(c *gin.Context){
 		return
 	}
 
-	if(req.loginType == "wechatMiniGame"){
-		code := req.loginData
+	if req.LoginType == "wechatMiniGame" {
+		code := req.LoginData
+		info, err := getWechatInfo(req.Appid)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to login",
+			})
+			return
+		}
+
+		values := url.Values{}
+		values.Add("appid", info.AppID)
+		values.Add("secret", info.Secret)
+		values.Add("js_code", code)
+		values.Add("grant_type", "authorization_code")
+		baseURL := "https://api.weixin.qq.com/sns/jscode2session"
+		fullURL := baseURL + "?" + values.Encode()
+		resp, err := http.Get(fullURL)
+		if err != nil {
+			log.Errorf("Failed to make HTTP request: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to make HTTP request",
+			})
+			return
+		}
+
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Errorf("Failed to read response body: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to read response body",
+			})
+			return
+		}
+
+		var wxresp struct {
+			SessionKey string `json:"session_key"`
+			Unionid    string `json:"unionid"`
+			Errmsg     string `json:"errmsg"`
+			Errcode    int    `json:"errcode"`
+			Openid     string `json:"openid"`
+		}
+
+		err = json.Unmarshal(body, &wxresp)
+		if err != nil {
+			log.Errorf("Failed to unmarshal response body: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to unmarshal response body",
+			})
+			return
+		}
+
+		token := md5.Sum([]byte(wxresp.SessionKey))
+		// 将 [16]byte 转换为十六进制字符串
+		tokenStr := fmt.Sprintf("%x", token)
+		c.JSON(http.StatusOK, gin.H{
+			"code":    200,
+			"message": "Success",
+			"data":    map[string]interface{}{"openid": wxresp.Openid, "token": tokenStr},
+		})
 
 	}
 }

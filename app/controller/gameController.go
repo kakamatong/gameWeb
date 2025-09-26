@@ -130,6 +130,7 @@ func ThirdLogin(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Errorf("Failed to ShouldBindJSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    400,
 			"message": "Invalid request",

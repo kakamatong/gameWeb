@@ -3,7 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
-	
+
 	"github.com/spf13/viper"
 )
 
@@ -27,9 +27,9 @@ func getEnvIntOrDefault(key string, defaultValue int) int {
 
 // WechatInfo 微信配置信息
 type WechatInfo struct {
-	ID     int    `mapstructure:"0"`
-	AppID  string `mapstructure:"1"`
-	Secret string `mapstructure:"2"`
+	ID     int    `mapstructure:"id"`
+	AppID  string `mapstructure:"appid"`
+	Secret string `mapstructure:"secret"`
 }
 
 // AppConfig 应用配置结构体
@@ -54,7 +54,7 @@ var AppConfig struct {
 		Database string
 		Charset  string
 	}
-	// root库配置 - 日志数据  
+	// root库配置 - 日志数据
 	MySQLGameLog struct {
 		Host     string
 		Port     string
@@ -83,10 +83,10 @@ var AppConfig struct {
 	// 管理后台JWT配置
 	Admin struct {
 		JWTSecretKey     string
-		TokenExpireHours int    
-		SessionTimeout   int    
-		MaxLoginAttempts int    
-		LockoutDuration  int    
+		TokenExpireHours int
+		SessionTimeout   int
+		MaxLoginAttempts int
+		LockoutDuration  int
 	}
 	// 添加GameServer配置
 	GameServer struct {
@@ -140,16 +140,18 @@ func InitConfig() {
 	viper.SetDefault("JWT.ExpireTime", getEnvIntOrDefault("JWT_EXPIRE_TIME", 3600)) // 默认1小时过期
 	// 添加管理后台JWT默认值
 	viper.SetDefault("Admin.JWTSecretKey", getEnvOrDefault("ADMIN_JWT_SECRET", "GameWebAdminJWTSecretKey987654321FEDCBA"))
-	viper.SetDefault("Admin.TokenExpireHours", getEnvIntOrDefault("ADMIN_TOKEN_EXPIRE_HOURS", 8))  // 8小时过期
-	viper.SetDefault("Admin.SessionTimeout", getEnvIntOrDefault("ADMIN_SESSION_TIMEOUT", 24))   // Redis会话24小时过期
-	viper.SetDefault("Admin.MaxLoginAttempts", getEnvIntOrDefault("ADMIN_MAX_LOGIN_ATTEMPTS", 5))  // 最大登录尝试次数
-	viper.SetDefault("Admin.LockoutDuration", getEnvIntOrDefault("ADMIN_LOCKOUT_DURATION", 30))  // 锁定时间（分钟）
+	viper.SetDefault("Admin.TokenExpireHours", getEnvIntOrDefault("ADMIN_TOKEN_EXPIRE_HOURS", 8)) // 8小时过期
+	viper.SetDefault("Admin.SessionTimeout", getEnvIntOrDefault("ADMIN_SESSION_TIMEOUT", 24))     // Redis会话24小时过期
+	viper.SetDefault("Admin.MaxLoginAttempts", getEnvIntOrDefault("ADMIN_MAX_LOGIN_ATTEMPTS", 5)) // 最大登录尝试次数
+	viper.SetDefault("Admin.LockoutDuration", getEnvIntOrDefault("ADMIN_LOCKOUT_DURATION", 30))   // 锁定时间（分钟）
 	// 添加GameServer默认值
 	viper.SetDefault("GameServer.Host", getEnvOrDefault("GAMESERVER_HOST", "localhost"))
 	viper.SetDefault("GameServer.Port", getEnvOrDefault("GAMESERVER_PORT", "9000"))
-	
+
 	// 添加WechatInfo默认值
-	viper.SetDefault("wechatInfo", [][]interface{}{{1, "", ""}})
+	viper.SetDefault("wechatInfo", []map[string]interface{}{
+		{"id": 1, "appid": "", "secret": ""},
+	})
 
 	if err := viper.ReadInConfig(); err != nil {
 		panic("Failed to read config file: " + err.Error())

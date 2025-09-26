@@ -35,7 +35,7 @@ func RegisterRoutes(router *gin.Engine) {
 		{
 			// 管理员认证相关路由（无需JWT认证）
 			admin.POST("/login", controller.AdminLogin)
-			
+
 			// 需要JWT认证的管理员路由
 			authorized := admin.Group("/")
 			authorized.Use(middleware.AdminJWTMiddleware())
@@ -44,7 +44,7 @@ func RegisterRoutes(router *gin.Engine) {
 				authorized.POST("/logout", controller.AdminLogout)
 				authorized.GET("/info", controller.GetAdminInfo)
 				authorized.PUT("/update/:id", controller.UpdateAdmin)
-				
+
 				// 管理员管理（仅超级管理员）
 				superAdmin := authorized.Group("/")
 				superAdmin.Use(middleware.RequireSuperAdmin())
@@ -53,7 +53,7 @@ func RegisterRoutes(router *gin.Engine) {
 					superAdmin.POST("/create-admin", controller.CreateAdmin)
 					superAdmin.DELETE("/delete/:id", controller.DeleteAdmin)
 				}
-				
+
 				// 用户管理相关路由
 				users := authorized.Group("/users")
 				{
@@ -61,7 +61,7 @@ func RegisterRoutes(router *gin.Engine) {
 					users.GET("/:userid", controller.GetUserDetail)
 					users.PUT("/:userid", controller.UpdateUser)
 				}
-				
+
 				// 日志查询相关路由
 				logs := authorized.Group("/logs")
 				{
@@ -70,7 +70,7 @@ func RegisterRoutes(router *gin.Engine) {
 					logs.GET("/login-stats", controller.GetUserLoginStats)
 					logs.GET("/game-stats", controller.GetUserGameStats)
 				}
-				
+
 				// 系统邮件相关路由
 				mails := authorized.Group("/mails")
 				{

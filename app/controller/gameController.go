@@ -196,6 +196,21 @@ func ThirdLogin(c *gin.Context) {
 		token := md5.Sum([]byte(wxresp.SessionKey))
 		// 将 [16]byte 转换为十六进制字符串
 		tokenStr := fmt.Sprintf("%x", token)
+
+		// 将数据写入account表
+		// 使用UPSERT操作：如果username存在则更新，否则插入新记录
+		_, err = db.MySQLDB.Exec(
+			"INSERT INTO account (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?, type = ?",
+			wxresp.Openid, tokenStr, req.LoginType, tokenStr, req.LoginType)
+		if err != nil {
+			log.Errorf("Failed to insert/update account data: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to save account data",
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"code":    200,
 			"message": "Success",

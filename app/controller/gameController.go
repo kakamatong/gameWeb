@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -196,12 +197,14 @@ func ThirdLogin(c *gin.Context) {
 		token := md5.Sum([]byte(wxresp.SessionKey))
 		// 将 [16]byte 转换为十六进制字符串
 		tokenStr := fmt.Sprintf("%x", token)
+		token2 := md5.Sum([]byte(tokenStr))
+		tokenStr2 := fmt.Sprintf("%x", token2)
 
 		// 将数据写入account表
 		// 使用UPSERT操作：如果username存在则更新，否则插入新记录
 		_, err = db.MySQLDB.Exec(
 			"INSERT INTO account (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?, type = ?",
-			wxresp.Openid, tokenStr, req.LoginType, tokenStr, req.LoginType)
+			wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, tokenStr, req.LoginType)
 		if err != nil {
 			log.Errorf("Failed to insert/update account data: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{

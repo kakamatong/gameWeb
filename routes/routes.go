@@ -17,6 +17,7 @@ func RegisterRoutes(router *gin.Engine) {
 		game.Use(middleware.AuthMiddlewareByJWT())
 		{
 			game.POST("/authlist", controller.GetAuthGameList)
+			game.POST("/thirdlogin", controller.ThirdLogin)
 		}
 
 		// 邮件相关路由 - 需要验签

@@ -106,3 +106,24 @@ func GetAuthGameList(c *gin.Context) {
 		"data": result,
 	})
 }
+
+func ThirdLogin(c *gin.Context){
+	var req struct {
+		appid int64 `json:"appid" binding:"required"`
+		loginType string `json:"loginType" binding:"required"`
+		loginData string `json:"loginData" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "Invalid request",
+		})
+		return
+	}
+
+	if(req.loginType == "wechatMiniGame"){
+		code := req.loginData
+
+	}
+}

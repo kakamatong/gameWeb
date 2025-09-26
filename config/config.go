@@ -25,6 +25,13 @@ func getEnvIntOrDefault(key string, defaultValue int) int {
 	return defaultValue
 }
 
+// WechatInfo 微信配置信息
+type WechatInfo struct {
+	ID     int    `mapstructure:"0"`
+	AppID  string `mapstructure:"1"`
+	Secret string `mapstructure:"2"`
+}
+
 // AppConfig 应用配置结构体
 var AppConfig struct {
 	Server struct {
@@ -86,6 +93,8 @@ var AppConfig struct {
 		Host string
 		Port string
 	}
+	// 添加WechatInfo配置
+	WechatInfos []WechatInfo `mapstructure:"wechatInfo"`
 }
 
 // InitConfig 初始化配置
@@ -138,6 +147,9 @@ func InitConfig() {
 	// 添加GameServer默认值
 	viper.SetDefault("GameServer.Host", getEnvOrDefault("GAMESERVER_HOST", "localhost"))
 	viper.SetDefault("GameServer.Port", getEnvOrDefault("GAMESERVER_PORT", "9000"))
+	
+	// 添加WechatInfo默认值
+	viper.SetDefault("wechatInfo", [][]interface{}{{1, "", ""}})
 
 	if err := viper.ReadInConfig(); err != nil {
 		panic("Failed to read config file: " + err.Error())

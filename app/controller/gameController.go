@@ -217,7 +217,7 @@ func ThirdLogin(c *gin.Context) {
 
 		// 将数据写入account表
 		// 使用UPSERT操作：如果username存在则更新，否则插入新记录
-		_, err = db.MySQLDB.Exec(
+		result, err := db.MySQLDB.Exec(
 			"INSERT INTO account (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?, type = ?",
 			wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, strings.ToUpper(tokenStr2), req.LoginType)
 		if err != nil {
@@ -227,6 +227,45 @@ func ThirdLogin(c *gin.Context) {
 				"message": "Failed to save account data",
 			})
 			return
+		}
+
+		// 检查是否是新插入的记录
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Errorf("Failed to get rows affected: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    500,
+				"message": "Failed to get insert result",
+			})
+			return
+		}
+
+		// 如果是新插入的数据，则额外往userData表里插入一条对应userid的默认数据
+		if rowsAffected > 0 {
+			// 获取新插入记录的userid
+			userid, err := result.LastInsertId()
+			if err != nil {
+				log.Errorf("Failed to get last insert id: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    500,
+					"message": "Failed to get user id",
+				})
+				return
+			}
+
+			// 插入userData表的默认数据
+			nickname := fmt.Sprintf("用户%d", userid)
+			_, err = db.MySQLDB.Exec(
+				"INSERT INTO userData (userid, nickname) VALUES (?, ?)",
+				userid, nickname)
+			if err != nil {
+				log.Errorf("Failed to insert user data: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    500,
+					"message": "Failed to save user data",
+				})
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{

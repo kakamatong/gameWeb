@@ -156,6 +156,7 @@ func ThirdLogin(c *gin.Context) {
 		values.Add("grant_type", "authorization_code")
 		baseURL := "https://api.weixin.qq.com/sns/jscode2session"
 		fullURL := baseURL + "?" + values.Encode()
+		log.Infof("WeChat API request URL: %s", fullURL)
 		resp, err := http.Get(fullURL)
 		if err != nil {
 			log.Errorf("Failed to make HTTP request: %v", err)
@@ -195,6 +196,19 @@ func ThirdLogin(c *gin.Context) {
 			return
 		}
 
+		// 检查微信返回的错误码
+		if wxresp.Errcode != 0 {
+			log.Errorf("WeChat API error, code: %d, message: %s", wxresp.Errcode, wxresp.Errmsg)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    wxresp.Errcode,
+				"message": "WeChat API error: " + wxresp.Errmsg,
+			})
+			return
+		}
+
+		log.Infof("WeChat response parsed: openid=%s, session_key=%s, unionid=%s",
+			wxresp.Openid, wxresp.SessionKey, wxresp.Unionid)
+
 		token := md5.Sum([]byte(wxresp.SessionKey))
 		// 将 [16]byte 转换为十六进制字符串
 		tokenStr := fmt.Sprintf("%x", token)
@@ -205,7 +219,7 @@ func ThirdLogin(c *gin.Context) {
 		// 使用UPSERT操作：如果username存在则更新，否则插入新记录
 		_, err = db.MySQLDB.Exec(
 			"INSERT INTO account (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?, type = ?",
-			wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, tokenStr, req.LoginType)
+			wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, strings.ToUpper(tokenStr2), req.LoginType)
 		if err != nil {
 			log.Errorf("Failed to insert/update account data: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -220,6 +234,5 @@ func ThirdLogin(c *gin.Context) {
 			"message": "Success",
 			"data":    map[string]interface{}{"openid": wxresp.Openid, "token": tokenStr},
 		})
-
 	}
 }

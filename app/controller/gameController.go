@@ -218,8 +218,8 @@ func ThirdLogin(c *gin.Context) {
 		// 将数据写入account表
 		// 使用UPSERT操作：如果username存在则更新，否则插入新记录
 		_, err = db.MySQLDB.Exec(
-			"INSERT INTO ? (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?",
-			req.LoginType, wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, strings.ToUpper(tokenStr2))
+			"INSERT INTO "+req.LoginType+" (username, password, type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = ?",
+			wxresp.Openid, strings.ToUpper(tokenStr2), req.LoginType, strings.ToUpper(tokenStr2))
 		if err != nil {
 			log.Errorf("Failed to insert/update account data: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
